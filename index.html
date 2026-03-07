@@ -1,27 +1,677 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
-    <title>Lovable App</title>
-    <meta name="description" content="Lovable Generated Project" />
-    <meta name="author" content="Lovable" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    <meta property="og:title" content="Lovable App" />
-    <meta property="og:description" content="Lovable Generated Project" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Evox Uno - Coming Soon</title>
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@Lovable" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-    <script type="module" crossorigin src="/assets/index-CwT4r7fE.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-D6KnycCn.css">
-  </head>
+  <link rel="stylesheet" href="./evox-index/style.css">
 
-  <body>
-    <div id="root"></div>
-  </body>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <link rel="icon" type="image/png" href="./epsilon-transparent.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./evox-logo-apple-simple.png">
+  <link rel="manifest" href="./index.json">
+  <meta property="og:title" content="Evox Uno - Coming Soon" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://evoxs.xyz/evox-uno/" />
+  <meta property="og:description"
+    content="Evox Uno is currently under development. Stay tuned for the next evolution in the Evox ecosystem.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <style>
+    /* ── Hero overrides ── */
+    .uno-hero {
+      margin-top: calc(var(--nav-height) + 80px);
+      text-align: center;
+      padding: 0 20px 20px;
+      position: relative;
+    }
+
+    .uno-hero h1 {
+      font-size: 4rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      background: linear-gradient(135deg, #fff 0%, #2997ff 50%, #bf5af2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+      animation: fadeIn 1s ease-out;
+    }
+
+    .uno-hero .subtitle {
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      max-width: 520px;
+      margin: 0 auto 30px;
+      animation: fadeIn 1.2s ease-out;
+    }
+
+    /* Glow ring behind hero */
+    .hero-glow {
+      position: absolute;
+      top: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(41, 151, 255, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* ── Status pill row ── */
+    .status-pills {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+      animation: fadeIn 1.3s ease-out;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .pill.blue {
+      background: rgba(41, 151, 255, 0.12);
+      color: var(--accent-blue);
+    }
+
+    .pill.purple {
+      background: rgba(191, 90, 242, 0.12);
+      color: var(--accent-purple);
+    }
+
+    .pill.orange {
+      background: rgba(255, 159, 10, 0.12);
+      color: var(--accent-orange);
+    }
+
+    .pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── Progress bar ── */
+    .progress-wrapper {
+      max-width: 460px;
+      margin: 24px auto 0;
+      animation: fadeIn 1.4s ease-out;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .progress-track {
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 2%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+      animation: progress-grow 1.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    @keyframes progress-grow {
+      from { width: 0; }
+      to { width: 2%; }
+    }
+
+    /* ── Stats ribbon ── */
+    .stats-ribbon {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+      padding: 48px 20px;
+      max-width: 800px;
+      margin: 0 auto;
+      animation: fadeIn 1.4s ease-out;
+    }
+
+    .ribbon-stat {
+      text-align: center;
+    }
+
+    .ribbon-stat .num {
+      display: block;
+      font-size: 2.4rem;
+      font-weight: 700;
+      background: linear-gradient(180deg, #fff, #888);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .ribbon-stat .label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 4px;
+    }
+
+    /* ── Bento feature grid ── */
+    .feature-grid {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 20px 60px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-l);
+      padding: 36px 30px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.3s;
+      animation: cardEntrance 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      opacity: 0;
+    }
+
+    .feature-card:nth-child(1) { animation-delay: 0.1s; }
+    .feature-card:nth-child(2) { animation-delay: 0.2s; }
+    .feature-card:nth-child(3) { animation-delay: 0.3s; }
+    .feature-card:nth-child(4) { animation-delay: 0.35s; }
+    .feature-card:nth-child(5) { animation-delay: 0.4s; }
+    .feature-card:nth-child(6) { animation-delay: 0.45s; }
+
+    .feature-card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .feature-card.span-2 {
+      grid-column: span 2;
+    }
+
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      font-size: 1.3rem;
+    }
+
+    .feature-icon.blue { background: rgba(41, 151, 255, 0.12); }
+    .feature-icon.purple { background: rgba(191, 90, 242, 0.12); }
+    .feature-icon.green { background: rgba(48, 209, 88, 0.12); }
+    .feature-icon.orange { background: rgba(255, 159, 10, 0.12); }
+    .feature-icon.red { background: rgba(255, 69, 58, 0.12); }
+
+    .feature-card h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+
+    .feature-card p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    /* ── Timeline section ── */
+    .timeline-section {
+      max-width: 700px;
+      margin: 0 auto 60px;
+      padding: 0 20px;
+    }
+
+    .timeline-section h2 {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 40px;
+      background: linear-gradient(180deg, #fff, #888);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .timeline {
+      position: relative;
+      padding-left: 32px;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 1px;
+    }
+
+    .tl-item {
+      position: relative;
+      margin-bottom: 36px;
+      animation: fadeIn 0.6s ease-out both;
+    }
+
+    .tl-item:nth-child(1) { animation-delay: 0.15s; }
+    .tl-item:nth-child(2) { animation-delay: 0.3s; }
+    .tl-item:nth-child(3) { animation-delay: 0.45s; }
+    .tl-item:nth-child(4) { animation-delay: 0.6s; }
+
+    .tl-dot {
+      position: absolute;
+      left: -28px;
+      top: 6px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--accent-blue);
+      background: var(--bg-body);
+    }
+
+    .tl-dot.done {
+      background: var(--accent-blue);
+    }
+
+    .tl-dot.active {
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 0 4px rgba(191, 90, 242, 0.2);
+    }
+
+    .tl-item h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+
+    .tl-item .tl-date {
+      font-size: 0.75rem;
+      color: var(--accent-blue);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .tl-item p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* ── CTA / Notify card ── */
+    .notify-section {
+      max-width: 700px;
+      margin: 0 auto 80px;
+      padding: 0 20px;
+    }
+
+    .notify-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-l);
+      padding: 60px 50px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .notify-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(41, 151, 255, 0.04), rgba(191, 90, 242, 0.04));
+      pointer-events: none;
+    }
+
+    .notify-card h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .notify-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      max-width: 440px;
+      margin: 0 auto 28px;
+      line-height: 1.55;
+    }
+
+    .notify-actions {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .btn-notify {
+      padding: 13px 28px;
+      border-radius: var(--radius-m);
+      font-weight: 600;
+      font-size: 0.9rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+
+    .btn-notify:hover {
+      transform: scale(0.98);
+      opacity: 0.9;
+    }
+
+    .btn-notify.primary {
+      background: #fff;
+      color: #000;
+    }
+
+    .btn-notify.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* ── Tech stack badges ── */
+    .tech-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .tech-badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .uno-hero h1 {
+        font-size: 2.6rem;
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .feature-card.span-2 {
+        grid-column: auto;
+      }
+
+      .stats-ribbon {
+        gap: 28px;
+        flex-wrap: wrap;
+      }
+
+      .ribbon-stat .num {
+        font-size: 1.8rem;
+      }
+
+      .notify-card {
+        padding: 40px 24px;
+      }
+
+      .hero-glow {
+        width: 300px;
+        height: 300px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav>
+    <div class="nav-logo">
+      <img src="./EvoxEPSILON.png" alt="Evox Logo">Evox Uno
+    </div>
+    <div class="nav-links">
+      <a href="https://evoxs.xyz/#projectGrid" data-i18n="nav_hub">Application Hub</a>
+      <a href="https://evoxs.xyz/#about" data-i18n="nav_about">About Evox</a>
+      <a href="https://evoxs.xyz/#contact" data-i18n="nav_contact">Contact</a>
+
+      <div class="custom-select" id="langCustomSelect">
+        <div class="select-trigger">
+          <span id="langSelectValue">EN</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
+            <path d="M1 1L5 5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <div class="select-options">
+          <div class="option" data-value="en">English</div>
+          <div class="option" data-value="el">Greek</div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ─── HERO ─── -->
+  <section class="uno-hero">
+    <div class="hero-glow"></div>
+
+    <div class="status-pills">
+      <span class="pill blue"><span class="pill-dot"></span> In Development</span>
+      <span class="pill purple"><span class="pill-dot"></span> Pre-Alpha</span>
+      <span class="pill orange"><span class="pill-dot"></span> Private Build</span>
+    </div>
+
+    <h1>Evox Uno</h1>
+    <p class="subtitle">The next-generation unified platform that brings every Evox service together into one seamless experience.</p>
+
+    <div class="progress-wrapper">
+      <div class="progress-header">
+        <span>Overall Progress</span>
+        <span>2 %</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── STATS RIBBON ─── -->
+  <section class="stats-ribbon">
+    <div class="ribbon-stat">
+      <span class="num">2%</span>
+      <span class="label">Built</span>
+    </div>
+    <div class="ribbon-stat">
+      <span class="num">Q4</span>
+      <span class="label">Target</span>
+    </div>
+    <div class="ribbon-stat">
+      <span class="num">6</span>
+      <span class="label">Core Modules</span>
+    </div>
+    <div class="ribbon-stat">
+      <span class="num">3</span>
+      <span class="label">Platforms</span>
+    </div>
+  </section>
+
+  <!-- ─── ABOUT CARD ─── -->
+  <section class="about-section" style="margin-top: 0;">
+    <div class="about-header">
+      <span class="badge ongoing">Under Development</span>
+      <h2>What is Project Uno?</h2>
+      <p style="padding: 0 20% 0 20%;">Evox Uno is a unified hub designed to consolidate every Evox application, messaging, transit, productivity, and social, into a single, cohesive platform with a shared account system and real-time sync.</p>
+    </div>
+
+    <div class="about-grid" style="display: flex; justify-content: center;">
+      <div class="about-card wide"
+        style="max-width: 860px; flex-direction: column; text-align: center; gap: 28px; padding: 50px;">
+        <div class="about-content">
+          <h3>The Vision</h3>
+          <p style="margin-top: 14px;">
+            Instead of switching between separate apps, Uno provides a single entry point for the entire Evox ecosystem. Your chats from Epsilon, transit data from OASA, school tools from Jeanne D'Arc, and task management from Tasco — all accessible within one interface, with a universal search, unified notifications, and cross-app workflows.
+          </p>
+          <p style="margin-top: 14px;">
+            Built on a modular architecture, Uno loads only the services you need, keeping the experience lightweight while offering the full power of every Evox product. Offline support, end-to-end encryption, and a responsive design ensure it works everywhere — from desktop browsers to mobile home-screen apps.
+          </p>
+
+          <div class="tech-row">
+            <span class="tech-badge">PWA</span>
+            <span class="tech-badge">WebSocket</span>
+            <span class="tech-badge">Firebase</span>
+            <span class="tech-badge">IndexedDB</span>
+            <span class="tech-badge">Service Workers</span>
+            <span class="tech-badge">End-to-End Encryption</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── FEATURE GRID ─── -->
+  <section class="about-section" style="margin-top: 0; margin-bottom: 20px;">
+    <div class="about-header">
+      <h2>Core Capabilities</h2>
+      <p>Six pillars powering the Uno experience.</p>
+    </div>
+  </section>
+
+  <div class="feature-grid">
+    <div class="feature-card span-2">
+      <div class="feature-icon blue">💬</div>
+      <h3>Unified Messaging</h3>
+      <p>All your Epsilon conversations, group chats, and channels in one place with real-time delivery, read receipts, and media sharing — no app switching required.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon green">🚍</div>
+      <h3>Live Transit</h3>
+      <p>OASA real-time bus tracking, route planning, and arrival predictions baked directly into Uno with offline timetable caching.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon purple">🎓</div>
+      <h3>Campus Tools</h3>
+      <p>Jeanne D'Arc school management, yearbook, and peer connection features — integrated with your unified Evox profile.</p>
+    </div>
+
+    <div class="feature-card span-2">
+      <div class="feature-icon orange">📋</div>
+      <h3>Tasks &amp; Notes</h3>
+      <p>Tasco-powered task lists, notes, and reminders synced across all devices. Create tasks from chat messages or transit alerts with one tap and stay organized effortlessly.</p>
+    </div>
+
+    <div class="feature-card span-2">
+      <div class="feature-icon red">🔔</div>
+      <h3>Smart Notifications</h3>
+      <p>Florida notification engine aggregates alerts from every module, applies priority rules, and delivers a single noise-free notification stream.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon blue">🔐</div>
+      <h3>Single Sign-On</h3>
+      <p>One Evox account grants access to every service. Secure, token-based authentication with optional biometric unlock on supported devices.</p>
+    </div>
+  </div>
+
+  <!-- ─── ROADMAP TIMELINE ─── -->
+  <section class="timeline-section">
+    <h2>Roadmap</h2>
+
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-dot done"></div>
+        <span class="tl-date">Q1 2026 — Completed</span>
+        <h4>Research &amp; Architecture</h4>
+        <p>Defined the modular architecture, selected the tech stack, and mapped integration points across all existing Evox apps.</p>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-dot active"></div>
+        <span class="tl-date">Q2 2026 — In Progress</span>
+        <h4>Core Shell &amp; Auth</h4>
+        <p>Building the main application shell, universal navigation, single sign-on flow, and the service-worker layer for offline support.</p>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <span class="tl-date">Q3 2026 — Planned</span>
+        <h4>Module Integration</h4>
+        <p>Plugging Epsilon messaging, OASA transit, and Tasco tasks into the Uno shell with cross-module deep linking.</p>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <span class="tl-date">Q4 2026 — Target</span>
+        <h4>Closed Beta Launch</h4>
+        <p>Invite-only beta for early testers. Collecting feedback, squashing bugs, and fine-tuning performance before the public release.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── CTA ─── -->
+  <section class="notify-section">
+    <div class="notify-card">
+      <h2>Stay in the Loop</h2>
+      <p>Evox Uno is being built in the open. Follow development progress, get early access invitations, and shape the product with your feedback.</p>
+      <div class="notify-actions">
+        <a href="https://evoxs.xyz" class="btn-notify primary">
+          <span>Return to Hub</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="transform: rotate(180deg);">
+            <path d="M1 11L11 1M11 1H3.5M11 1V8.5" stroke="black" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </a>
+        <a href="https://evoxs.xyz/support" class="btn-notify secondary">Contact Support</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-links">
+      <a href="https://evoxs.xyz/privacy">Privacy Policy</a>
+      <a href="https://evoxs.xyz/support">Support</a>
+    </div>
+    <div class="copyright">© 2026 Evox Systems. All rights reserved.</div>
+  </footer>
+
+  <script src="./evox-index/script.js"></script>
+  <script src="./evox-index/lang.js"></script>
+</body>
+
 </html>
