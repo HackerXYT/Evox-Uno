@@ -1,5 +1,5 @@
 const CLIENT_ID = "314460881843-5k3d8113ch5clklju6rhu23hgmilnsdv.apps.googleusercontent.com";
-const REDIRECT_URI = "https://evox.uno/auth.html";
+const REDIRECT_URI = "https://evox.uno/login/auth.html";
 
 document.getElementById("login").onclick = () => {
 
