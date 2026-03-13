@@ -107,8 +107,15 @@
     }
 
     @keyframes pulse-dot {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
     }
 
     /* ── Progress bar ── */
@@ -143,8 +150,13 @@
     }
 
     @keyframes progress-grow {
-      from { width: 0; }
-      to { width: 2%; }
+      from {
+        width: 0;
+      }
+
+      to {
+        width: 2%;
+      }
     }
 
     /* ── Stats ribbon ── */
@@ -200,12 +212,29 @@
       opacity: 0;
     }
 
-    .feature-card:nth-child(1) { animation-delay: 0.1s; }
-    .feature-card:nth-child(2) { animation-delay: 0.2s; }
-    .feature-card:nth-child(3) { animation-delay: 0.3s; }
-    .feature-card:nth-child(4) { animation-delay: 0.35s; }
-    .feature-card:nth-child(5) { animation-delay: 0.4s; }
-    .feature-card:nth-child(6) { animation-delay: 0.45s; }
+    .feature-card:nth-child(1) {
+      animation-delay: 0.1s;
+    }
+
+    .feature-card:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .feature-card:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+
+    .feature-card:nth-child(4) {
+      animation-delay: 0.35s;
+    }
+
+    .feature-card:nth-child(5) {
+      animation-delay: 0.4s;
+    }
+
+    .feature-card:nth-child(6) {
+      animation-delay: 0.45s;
+    }
 
     .feature-card:hover {
       transform: translateY(-6px);
@@ -227,11 +256,25 @@
       font-size: 1.3rem;
     }
 
-    .feature-icon.blue { background: rgba(41, 151, 255, 0.12); }
-    .feature-icon.purple { background: rgba(191, 90, 242, 0.12); }
-    .feature-icon.green { background: rgba(48, 209, 88, 0.12); }
-    .feature-icon.orange { background: rgba(255, 159, 10, 0.12); }
-    .feature-icon.red { background: rgba(255, 69, 58, 0.12); }
+    .feature-icon.blue {
+      background: rgba(41, 151, 255, 0.12);
+    }
+
+    .feature-icon.purple {
+      background: rgba(191, 90, 242, 0.12);
+    }
+
+    .feature-icon.green {
+      background: rgba(48, 209, 88, 0.12);
+    }
+
+    .feature-icon.orange {
+      background: rgba(255, 159, 10, 0.12);
+    }
+
+    .feature-icon.red {
+      background: rgba(255, 69, 58, 0.12);
+    }
 
     .feature-card h3 {
       font-size: 1.1rem;
@@ -286,10 +329,21 @@
       animation: fadeIn 0.6s ease-out both;
     }
 
-    .tl-item:nth-child(1) { animation-delay: 0.15s; }
-    .tl-item:nth-child(2) { animation-delay: 0.3s; }
-    .tl-item:nth-child(3) { animation-delay: 0.45s; }
-    .tl-item:nth-child(4) { animation-delay: 0.6s; }
+    .tl-item:nth-child(1) {
+      animation-delay: 0.15s;
+    }
+
+    .tl-item:nth-child(2) {
+      animation-delay: 0.3s;
+    }
+
+    .tl-item:nth-child(3) {
+      animation-delay: 0.45s;
+    }
+
+    .tl-item:nth-child(4) {
+      animation-delay: 0.6s;
+    }
 
     .tl-dot {
       position: absolute;
@@ -497,7 +551,8 @@
     </div>
 
     <h1>Evox Uno</h1>
-    <p class="subtitle">The next-generation unified platform that brings every Evox service together into one seamless experience.</p>
+    <p class="subtitle">The next-generation unified platform that brings every Evox service together into one seamless
+      experience.</p>
 
     <div class="progress-wrapper">
       <div class="progress-header">
@@ -535,7 +590,9 @@
     <div class="about-header">
       <span class="badge ongoing">Under Development</span>
       <h2>What is Project Uno?</h2>
-      <p style="padding: 0 20% 0 20%;">Evox Uno is a unified hub designed to consolidate every Evox application, messaging, transit, productivity, and social, into a single, cohesive platform with a shared account system and real-time sync.</p>
+      <p style="padding: 0 20% 0 20%;">Evox Uno is a unified hub designed to consolidate every Evox application,
+        messaging, transit, productivity, and social, into a single, cohesive platform with a shared account system and
+        real-time sync.</p>
     </div>
 
     <div class="about-grid" style="display: flex; justify-content: center;">
@@ -544,10 +601,15 @@
         <div class="about-content">
           <h3>The Vision</h3>
           <p style="margin-top: 14px;">
-            Instead of switching between separate apps, Uno provides a single entry point for the entire Evox ecosystem. Your chats from Epsilon, transit data from OASA, school tools from Jeanne D'Arc, and task management from Tasco — all accessible within one interface, with a universal search, unified notifications, and cross-app workflows.
+            Instead of switching between separate apps, Uno provides a single entry point for the entire Evox ecosystem.
+            Your chats from Epsilon, transit data from OASA, school tools from Jeanne D'Arc, and task management from
+            Tasco — all accessible within one interface, with a universal search, unified notifications, and cross-app
+            workflows.
           </p>
           <p style="margin-top: 14px;">
-            Built on a modular architecture, Uno loads only the services you need, keeping the experience lightweight while offering the full power of every Evox product. Offline support, end-to-end encryption, and a responsive design ensure it works everywhere — from desktop browsers to mobile home-screen apps.
+            Built on a modular architecture, Uno loads only the services you need, keeping the experience lightweight
+            while offering the full power of every Evox product. Offline support, end-to-end encryption, and a
+            responsive design ensure it works everywhere — from desktop browsers to mobile home-screen apps.
           </p>
 
           <div class="tech-row">
@@ -573,39 +635,112 @@
 
   <div class="feature-grid">
     <div class="feature-card span-2">
-      <div class="feature-icon blue">💬</div>
+      <div class="feature-icon blue">
+        <svg xmlns="http://www.w3.org/2000/svg" width="25px" height="25px" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 13.5997 2.37562 15.1116 3.04346 16.4525C3.22094 16.8088 3.28001 17.2161 3.17712 17.6006L2.58151 19.8267C2.32295 20.793 3.20701 21.677 4.17335 21.4185L6.39939 20.8229C6.78393 20.72 7.19121 20.7791 7.54753 20.9565C8.88837 21.6244 10.4003 22 12 22Z"
+            stroke="#fff" stroke-width="1.5" />
+          <path d="M12 16V8" stroke="#fff" stroke-width="1.5" stroke-linecap="round" />
+          <path d="M8 14V10" stroke="#fff" stroke-width="1.5" stroke-linecap="round" />
+          <path d="M16 14V10" stroke="#fff" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+      </div>
       <h3>Unified Messaging</h3>
-      <p>All your Epsilon conversations, group chats, and channels in one place with real-time delivery, read receipts, and media sharing — no app switching required.</p>
+      <p>All your Epsilon conversations, group chats, and channels in one place with real-time delivery, read receipts,
+        and media sharing — no app switching required.</p>
     </div>
 
     <div class="feature-card">
-      <div class="feature-icon green">🚍</div>
+      <div class="feature-icon green"><svg xmlns="http://www.w3.org/2000/svg" width="25px" height="25px"
+          viewBox="0 0 24 24" fill="none">
+          <path
+            d="M4 10C4 6.22876 4 4.34315 5.17157 3.17157C6.34315 2 8.22876 2 12 2C15.7712 2 17.6569 2 18.8284 3.17157C20 4.34315 20 6.22876 20 10V12C20 15.7712 20 17.6569 18.8284 18.8284C17.6569 20 15.7712 20 12 20C8.22876 20 6.34315 20 5.17157 18.8284C4 17.6569 4 15.7712 4 12V10Z"
+            stroke="#FFF" stroke-width="1.5" />
+          <path d="M4 13H20" stroke="#FFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M15.5 16H17" stroke="#FFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M7 16H8.5" stroke="#FFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M6 19.5V21C6 21.5523 6.44772 22 7 22H8.5C9.05228 22 9.5 21.5523 9.5 21V20" stroke="#FFF"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M18 19.5V21C18 21.5523 17.5523 22 17 22H15.5C14.9477 22 14.5 21.5523 14.5 21V20" stroke="#FFF"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M20 9H21C21.5523 9 22 9.44772 22 10V11C22 11.3148 21.8518 11.6111 21.6 11.8L20 13" stroke="#FFF"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M4 9H3C2.44772 9 2 9.44772 2 10V11C2 11.3148 2.14819 11.6111 2.4 11.8L4 13" stroke="#FFF"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M19.5 5H4.5" stroke="#FFF" stroke-width="1.5" stroke-linecap="round" />
+        </svg></div>
       <h3>Live Transit</h3>
-      <p>OASA real-time bus tracking, route planning, and arrival predictions baked directly into Uno with offline timetable caching.</p>
+      <p>OASA real-time bus tracking, route planning, and arrival predictions baked directly into Uno with offline
+        timetable caching.</p>
     </div>
 
     <div class="feature-card">
-      <div class="feature-icon purple">🎓</div>
+      <div class="feature-icon purple"><svg xmlns="http://www.w3.org/2000/svg" width="25px" height="25px"
+          viewBox="0 0 24 24" fill="none">
+          <path
+            d="M3.84299 8.12534L11.1877 4.86101C11.7049 4.63118 12.2951 4.63118 12.8123 4.86101L20.157 8.12534C20.4817 8.26962 20.4817 8.73038 20.157 8.87466L12.8123 12.139C12.2951 12.3688 11.7049 12.3688 11.1877 12.139L3.84299 8.87466C3.51835 8.73038 3.51835 8.26962 3.84299 8.12534Z"
+            stroke="#FFF" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M20.5 8.5V12.5" stroke="#FFF" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M6.5 10.5V15.5C6.5 15.5 7 17.5 12 17.5C17 17.5 17.5 15.5 17.5 15.5V10.5" stroke="#FFF"
+            stroke-linecap="round" stroke-linejoin="round" />
+        </svg></div>
       <h3>Campus Tools</h3>
-      <p>Jeanne D'Arc school management, yearbook, and peer connection features — integrated with your unified Evox profile.</p>
+      <p>Jeanne D'Arc school management, yearbook, and peer connection features — integrated with your unified Evox
+        profile.</p>
     </div>
 
     <div class="feature-card span-2">
-      <div class="feature-icon orange">📋</div>
+      <div class="feature-icon orange"><svg xmlns="http://www.w3.org/2000/svg" width="25px" height="25px"
+          viewBox="0 0 24 24" fill="none">
+          <path
+            d="M19.9994 19.2611H10.9294C10.4794 19.2611 10.1094 18.8911 10.1094 18.4411C10.1094 17.9911 10.4794 17.6211 10.9294 17.6211H19.9994C20.4494 17.6211 20.8194 17.9911 20.8194 18.4411C20.8194 18.9011 20.4494 19.2611 19.9994 19.2611Z"
+            fill="#FFF" />
+          <path
+            d="M19.9994 12.9681H10.9294C10.4794 12.9681 10.1094 12.5981 10.1094 12.1481C10.1094 11.6981 10.4794 11.3281 10.9294 11.3281H19.9994C20.4494 11.3281 20.8194 11.6981 20.8194 12.1481C20.8194 12.5981 20.4494 12.9681 19.9994 12.9681Z"
+            fill="#FFF" />
+          <path
+            d="M19.9994 6.67125H10.9294C10.4794 6.67125 10.1094 6.30125 10.1094 5.85125C10.1094 5.40125 10.4794 5.03125 10.9294 5.03125H19.9994C20.4494 5.03125 20.8194 5.40125 20.8194 5.85125C20.8194 6.30125 20.4494 6.67125 19.9994 6.67125Z"
+            fill="#FFF" />
+          <path
+            d="M4.90969 8.03187C4.68969 8.03187 4.47969 7.94187 4.32969 7.79187L3.41969 6.88188C3.09969 6.56188 3.09969 6.04187 3.41969 5.72187C3.73969 5.40187 4.25969 5.40187 4.57969 5.72187L4.90969 6.05188L7.04969 3.91187C7.36969 3.59188 7.88969 3.59188 8.20969 3.91187C8.52969 4.23188 8.52969 4.75188 8.20969 5.07188L5.48969 7.79187C5.32969 7.94187 5.12969 8.03187 4.90969 8.03187Z"
+            fill="#FFF" />
+          <path
+            d="M4.90969 14.3287C4.69969 14.3287 4.48969 14.2487 4.32969 14.0887L3.41969 13.1788C3.09969 12.8588 3.09969 12.3388 3.41969 12.0188C3.73969 11.6988 4.25969 11.6988 4.57969 12.0188L4.90969 12.3488L7.04969 10.2087C7.36969 9.88875 7.88969 9.88875 8.20969 10.2087C8.52969 10.5288 8.52969 11.0487 8.20969 11.3687L5.48969 14.0887C5.32969 14.2487 5.11969 14.3287 4.90969 14.3287Z"
+            fill="#FFF" />
+          <path
+            d="M4.90969 20.3288C4.69969 20.3288 4.48969 20.2488 4.32969 20.0888L3.41969 19.1788C3.09969 18.8588 3.09969 18.3388 3.41969 18.0188C3.73969 17.6988 4.25969 17.6988 4.57969 18.0188L4.90969 18.3488L7.04969 16.2087C7.36969 15.8888 7.88969 15.8888 8.20969 16.2087C8.52969 16.5288 8.52969 17.0488 8.20969 17.3688L5.48969 20.0888C5.32969 20.2488 5.11969 20.3288 4.90969 20.3288Z"
+            fill="#FFF" />
+        </svg></div>
       <h3>Tasks &amp; Notes</h3>
-      <p>Tasco-powered task lists, notes, and reminders synced across all devices. Create tasks from chat messages or transit alerts with one tap and stay organized effortlessly.</p>
+      <p>Tasco-powered task lists, notes, and reminders synced across all devices. Create tasks from chat messages or
+        transit alerts with one tap and stay organized effortlessly.</p>
     </div>
 
     <div class="feature-card span-2">
-      <div class="feature-icon red">🔔</div>
+      <div class="feature-icon red"><svg xmlns="http://www.w3.org/2000/svg" width="25px" height="25px"
+          viewBox="0 0 24 24" fill="none">
+          <path fill-rule="evenodd" clip-rule="evenodd"
+            d="M11.5 1C10.9477 1 10.5 1.44772 10.5 2V3H9.99998C7.23864 3 4.99999 5.23825 4.99999 7.99975V11C4.99999 11.7377 4.76718 12.5722 4.39739 13.4148C4.03165 14.2482 3.55876 15.0294 3.14142 15.6439C2.38188 16.7624 2.85216 18.5301 4.40564 18.8103C5.42144 18.9935 6.85701 19.2115 8.54656 19.3527C8.54454 19.4015 8.54352 19.4506 8.54352 19.5C8.54352 21.433 10.1105 23 12.0435 23C13.9765 23 15.5435 21.433 15.5435 19.5C15.5435 19.4482 15.5424 19.3966 15.5402 19.3453C17.1921 19.204 18.596 18.9903 19.5943 18.8103C21.1478 18.5301 21.6181 16.7624 20.8586 15.6439C20.4412 15.0294 19.9683 14.2482 19.6026 13.4148C19.2328 12.5722 19 11.7377 19 11V7.99975C19 5.23825 16.7613 3 14 3H13.5V2C13.5 1.44772 13.0523 1 12.5 1H11.5ZM12 19.5C12.5113 19.5 13.0122 19.4898 13.4997 19.4715C13.5076 20.2758 12.8541 20.9565 12.0435 20.9565C11.2347 20.9565 10.5803 20.2778 10.5872 19.4747C11.0473 19.491 11.5191 19.5 12 19.5ZM9.99998 5C8.34305 5 6.99999 6.34298 6.99999 7.99975V11C6.99999 12.1234 6.65547 13.2463 6.22878 14.2186C5.79804 15.2 5.25528 16.0911 4.79599 16.7675C4.78578 16.7825 4.78102 16.7969 4.77941 16.8113C4.77797 16.8242 4.77919 16.8362 4.78167 16.8458C6.3644 17.1303 9.00044 17.5 12 17.5C14.9995 17.5 17.6356 17.1303 19.2183 16.8458C19.2208 16.8362 19.222 16.8242 19.2206 16.8113C19.2189 16.7969 19.2142 16.7825 19.204 16.7675C18.7447 16.0911 18.2019 15.2 17.7712 14.2186C17.3445 13.2463 17 12.1234 17 11V7.99975C17 6.34298 15.6569 5 14 5H9.99998Z"
+            fill="#FFF" />
+        </svg></div>
       <h3>Smart Notifications</h3>
-      <p>Florida notification engine aggregates alerts from every module, applies priority rules, and delivers a single noise-free notification stream.</p>
+      <p>Florida notification engine aggregates alerts from every module, applies priority rules, and delivers a single
+        noise-free notification stream.</p>
     </div>
 
     <div class="feature-card">
-      <div class="feature-icon blue">🔐</div>
+      <div class="feature-icon blue"><svg xmlns="http://www.w3.org/2000/svg" width="25px" height="25px"
+          viewBox="0 0 24 24" fill="none">
+          <path opacity="0.6"
+            d="M20.9099 11.1198C20.9099 16.0098 17.3599 20.5898 12.5099 21.9298C12.1799 22.0198 11.8198 22.0198 11.4898 21.9298C6.63984 20.5898 3.08984 16.0098 3.08984 11.1198V6.72979C3.08984 5.90979 3.70986 4.97979 4.47986 4.66979L10.0498 2.38982C11.2998 1.87982 12.7098 1.87982 13.9598 2.38982L19.5298 4.66979C20.2898 4.97979 20.9199 5.90979 20.9199 6.72979L20.9099 11.1198Z"
+            stroke="#FFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path
+            d="M10.0399 2.38982C11.2899 1.87982 12.6999 1.87982 13.9499 2.38982L19.5198 4.66979C20.2798 4.97979 20.9099 5.90979 20.9099 6.72979V11.1198C20.9099 16.0098 17.3599 20.5898 12.5099 21.9298C12.1799 22.0198 11.8198 22.0198 11.4898 21.9298C6.63984 20.5898 3.08984 16.0098 3.08984 11.1198"
+            stroke="#FFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg></div>
       <h3>Single Sign-On</h3>
-      <p>One Evox account grants access to every service. Secure, token-based authentication with optional biometric unlock on supported devices.</p>
+      <p>One Evox account grants access to every service. Secure, token-based authentication with optional biometric
+        unlock on supported devices.</p>
     </div>
   </div>
 
@@ -618,28 +753,32 @@
         <div class="tl-dot done"></div>
         <span class="tl-date">Q1 2026 — Completed</span>
         <h4>Research &amp; Architecture</h4>
-        <p>Defined the modular architecture, selected the tech stack, and mapped integration points across all existing Evox apps.</p>
+        <p>Defined the modular architecture, selected the tech stack, and mapped integration points across all existing
+          Evox apps.</p>
       </div>
 
       <div class="tl-item">
         <div class="tl-dot active"></div>
         <span class="tl-date">Q2 2026 — In Progress</span>
         <h4>Core Shell &amp; Auth</h4>
-        <p>Building the main application shell, universal navigation, single sign-on flow, and the service-worker layer for offline support.</p>
+        <p>Building the main application shell, universal navigation, single sign-on flow, and the service-worker layer
+          for offline support.</p>
       </div>
 
       <div class="tl-item">
         <div class="tl-dot"></div>
         <span class="tl-date">Q3 2026 — Planned</span>
         <h4>Module Integration</h4>
-        <p>Plugging Epsilon messaging, OASA transit, and Tasco tasks into the Uno shell with cross-module deep linking.</p>
+        <p>Plugging Epsilon messaging, OASA transit, and Tasco tasks into the Uno shell with cross-module deep linking.
+        </p>
       </div>
 
       <div class="tl-item">
         <div class="tl-dot"></div>
         <span class="tl-date">Q4 2026 — Target</span>
         <h4>Closed Beta Launch</h4>
-        <p>Invite-only beta for early testers. Collecting feedback, squashing bugs, and fine-tuning performance before the public release.</p>
+        <p>Invite-only beta for early testers. Collecting feedback, squashing bugs, and fine-tuning performance before
+          the public release.</p>
       </div>
     </div>
   </section>
@@ -648,7 +787,8 @@
   <section class="notify-section">
     <div class="notify-card">
       <h2>Stay in the Loop</h2>
-      <p>Evox Uno is being built in the open. Follow development progress, get early access invitations, and shape the product with your feedback.</p>
+      <p>Evox Uno is being built in the open. Follow development progress, get early access invitations, and shape the
+        product with your feedback.</p>
       <div class="notify-actions">
         <a href="https://evoxs.xyz" class="btn-notify primary">
           <span>Return to Hub</span>
