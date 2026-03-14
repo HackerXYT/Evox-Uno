@@ -1,0 +1,300 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: #000000;
+    color: #ffffff;
+    font-family: 'Inter', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.split-layout {
+    display: flex;
+    height: 100%;
+    width: 100%;
+}
+
+/* --- Left Panel --- */
+.left-panel {
+    width: 50%;
+    position: relative;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.logo {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.5px;
+    z-index: 2;
+}
+
+.logo sup {
+    font-size: 10px;
+}
+
+.graphic-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 350px;
+    height: 350px;
+    z-index: 2;
+}
+
+.asterisk-placeholder {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0.8;
+}
+
+.footer-copy {
+    font-size: 10px;
+    color: #444;
+    z-index: 2;
+}
+
+/* Faint background grid lines on the left */
+.grid-line-x {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.grid-line-y {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 1px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.grid-line-d1 {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    transform-origin: center;
+    transform: rotate(45deg) scale(1.5);
+}
+
+.grid-line-d2 {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    transform-origin: center;
+    transform: rotate(-45deg) scale(1.5);
+}
+
+/* --- Right Panel --- */
+.right-panel-wrapper {
+    width: 50%;
+    padding: 12px 12px 12px 0;
+    /* Creates the outer black border around the grey card */
+}
+
+.right-card {
+    background: radial-gradient(circle at 40% 40%, #171717, #0d0d0d);
+    height: 100%;
+    border-radius: 24px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.top-nav {
+    padding: 40px;
+    text-align: right;
+}
+
+.top-nav a {
+    color: #888;
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 400;
+}
+
+.form-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 10%;
+    margin-top: -60px;
+    /* Slight vertical adjustment */
+}
+
+h1 {
+    font-size: 64px;
+    font-weight: 400;
+    margin-bottom: 60px;
+    letter-spacing: -1.5px;
+}
+
+.input-row {
+    display: flex;
+    gap: 50px;
+    margin-bottom: 25px;
+}
+
+.input-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.input-group label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #999;
+    margin-bottom: 12px;
+}
+
+.password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-group input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #444;
+    color: #fff;
+    font-size: 14px;
+    padding-bottom: 12px;
+    outline: none;
+    transition: border-color 0.3s;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+}
+
+input[type="password"] {
+    letter-spacing: 3px;
+    font-size: 18px;
+}
+
+.input-group input:focus {
+    border-bottom-color: #fff;
+}
+
+.eye-toggle {
+    position: absolute;
+    right: 0;
+    bottom: 12px;
+    cursor: pointer;
+    color: #666;
+    display: flex;
+}
+
+.eye-toggle svg {
+    width: 14px;
+    height: 14px;
+    transition: color 0.3s;
+}
+
+.eye-toggle:hover svg {
+    color: #fff;
+}
+
+.options-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Custom Checkbox */
+.remember-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 11px;
+    color: #999;
+    user-select: none;
+}
+
+.remember-checkbox input {
+    display: none;
+}
+
+.custom-checkmark {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #555;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.custom-checkmark svg {
+    width: 8px;
+    height: 8px;
+    color: transparent;
+}
+
+.remember-checkbox input:checked+.custom-checkmark {
+    border-color: #fff;
+}
+
+.remember-checkbox input:checked+.custom-checkmark svg {
+    color: #fff;
+}
+
+.forgot-link {
+    color: #666;
+    text-decoration: none;
+    font-size: 11px;
+    transition: color 0.3s;
+}
+
+.forgot-link:hover {
+    color: #fff;
+}
+
+/* Large Round Button */
+.sign-in-btn {
+    position: absolute;
+    bottom: 40px;
+    right: 40px;
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    background-color: #fff;
+    color: #000;
+    border: none;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: 0.5px;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sign-in-btn:hover {
+    transform: scale(1.05);
+}

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golden Suisse Login</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="split-layout">
+
+        <div class="left-panel">
+            <div class="grid-line-x"></div>
+            <div class="grid-line-y"></div>
+            <div class="grid-line-d1"></div>
+            <div class="grid-line-d2"></div>
+
+            <div class="logo">Golden Suisse<sup>®</sup></div>
+
+            <div class="graphic-container">
+                <img src="../../EvoxEPSILON.png" alt="Asterisk Graphic Placeholder" class="asterisk-placeholder">
+            </div>
+
+            <div class="footer-copy">© GoldenSuisse 2022. All rights reserved.</div>
+        </div>
+
+        <div class="right-panel-wrapper">
+            <div class="right-card">
+
+                <div class="top-nav">
+                    <a href="#">Create an account</a>
+                </div>
+
+                <div class="form-container">
+                    <h1>Login</h1>
+
+                    <form onsubmit="event.preventDefault();">
+                        <div class="input-row">
+                            <div class="input-group">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" value="mark.johnson@gmail.com">
+                            </div>
+
+                            <div class="input-group">
+                                <label for="password">Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" id="password" value="123456789">
+                                    <span class="eye-toggle" id="togglePassword">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="options-row">
+                            <label class="remember-checkbox">
+                                <input type="checkbox" checked>
+                                <span class="custom-checkmark">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </span>
+                                Remember me
+                            </label>
+
+                            <a href="#" class="forgot-link">Forgot?</a>
+                        </div>
+                    </form>
+                </div>
+
+                <button class="sign-in-btn">SIGN IN</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
