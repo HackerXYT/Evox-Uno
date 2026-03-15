@@ -30,7 +30,7 @@
         <form id="loginForm">
             <input type="email" id="id" placeholder="Email address" required>
             <input type="password" id="pswd" placeholder="••••••••••••••••" required>
-            <button type="submit" onclick="login()" class="primary-btn">Sign in</button>
+            <button type="submit" class="primary-btn">Sign in</button>
         </form>
 
         <a href="#" class="magic-link">Sign in using magic link</a>
@@ -63,13 +63,13 @@
             <img src="../uno-transparent-square-white.png" alt="Logo">
         </div>
 
-        <h1>Welcome back Gregory</h1>
+        <h1 id="greeting">Welcome back.</h1>
         <p class="subtitle">We’ve sent a 6-digit verification code to your email.<br>Enter it below to sign in to your
             account.</p>
 
-        <form id="loginForm">
+        <form id="twoFaForm">
             <input type="number" id="code" placeholder="••••••" required>
-            <button type="submit" onclick="verify()" class="primary-btn">Verify</button>
+            <button type="submit" class="primary-btn">Verify</button>
         </form>
 
         <p class="terms">
@@ -78,94 +78,24 @@
         </p>
     </main>
 
-    <script>
-        // Optional JS to handle simple form prevention and button states
-        document.getElementById('loginForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-            console.log('Login attempt');
-        });
+    <main id="loading" style="display: none;" class="login-container">
+        <div class="loadingContainer">
+            <div class="content">
+                <div class="loader-circle"></div>
+                <div class="loader-line-mask">
+                    <div class="loader-line"></div>
+                </div>
+                <img width="60px" height="60px" src="../uno-transparent-square-white.png" alt="Logo">
+            </div>
+        </div>
 
-        document.querySelector('.back-button').addEventListener('click', function () {
-            console.log('Back button clicked');
-        });
+        <h1 class="signintext">Signing you in...</h1>
 
-        let tempAccount = null;
 
-        function twoFactorAuth() {
-            document.getElementById('login').style.display = 'none';
-            document.getElementById('2fa').style.display = 'flex';
-        }
+    </main>
 
-        function twoFactorAuthCheck() {
-            if (tempAccount === null) {
-                alert("No login attempt found. Please login first.");
-                return;
-            }
-            const email = tempAccount.email
-            const password = tempAccount.password
-            const username = tempAccount.username
-            const code = document.getElementById('code').value
-            fetch("http://localhost:3000/2FA", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Forwarded-For": "1.2.3.4"
-                },
-                body: JSON.stringify({
-                    email,
-                    password,
-                    username,
-                    code
-                })
-            })
-                .then(res => res.json())
-                .then(data => {
-                    console.log(data)
-                    if (data.success) {
-                        console.log("2FA successful, login complete")
-                    } else {
-                        alert("Login failed: " + data.message);
-                    }
-                })
-                .catch(err => console.error(err));
-        }
-        function login() {
-            const identifier = document.getElementById('id').value
-            const password = document.getElementById('pswd').value
-            if (!identifier || !password) {
-                alert("Please enter both email and password.");
-                return;
-            }
-            fetch("http://localhost:3000/login", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Forwarded-For": "1.2.3.4"
-                },
-                body: JSON.stringify({
-                    identifier,
-                    password
-                })
-            })
-                .then(res => res.json())
-                .then(data => {
-                    console.log(data)
-                    if (data.success) {
-                        if (data.twofactordone === true) {
-                            console.log("Login complete")
-                        } else {
+    <script src="script.js"></script>
 
-                            tempAccount = data
-                            twoFactorAuth()
-                        }
-                    } else {
-                        alert("Login failed: " + data.message);
-                    }
-                })
-                .catch(err => console.error(err));
-        }
-
-    </script>
 </body>
 
 </html>
