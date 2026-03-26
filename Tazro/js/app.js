@@ -1,0 +1,1824 @@
+/* ============================================
+   Finavox — Apple-Style Finance App
+   Application Logic
+   ============================================ */
+
+// ---- STATE ----
+const defaultState = {
+  user: { name: 'Unknown', initial: 'G' },
+  balance: 1957.43,
+  savings: 842.50,
+  currentView: 'home',
+  selectedDate: new Date(),
+  addSheetOpen: false,
+  debtSheetOpen: false,
+  goalSheetOpen: false,
+  addType: 'expense',
+  amountStr: '',
+  selectedCategory: null,
+  debtType: 'owe',
+  savingsTransferSource: 'main',
+  debtViewTab: 'owe',
+  faIconPickerOpen: false,
+  faFreeIcons: [],
+  faFilteredFreeIcons: [],
+  faIconPage: 0,
+  faIconQuery: '',
+  faIconsLoading: false,
+  editingDebtId: null,
+  transactionFilter: 'all',
+  searchQuery: '',
+  transactions: [],
+  savingsGoals: [],
+  debts: [],
+};
+
+let persistedState = null;
+try {
+  const rawState = localStorage.getItem('tazroState');
+  persistedState = rawState ? JSON.parse(rawState) : null;
+} catch (_err) {
+  persistedState = null;
+}
+
+const state = {
+  ...defaultState,
+  ...(persistedState && typeof persistedState === 'object' ? persistedState : {}),
+  user: {
+    ...defaultState.user,
+    ...(persistedState && persistedState.user ? persistedState.user : {}),
+  },
+};
+
+// ---- API ----
+const API = 'https://uno.evox.uno/tazro';
+
+function getAuthToken() {
+  const localToken = localStorage.getItem('evx-account') ? JSON.parse(localStorage.getItem('evx-account')).evxToken : '';
+
+  return localToken;
+}
+
+function withAuthHeaders(headers = {}) {
+  const token = getAuthToken();
+  if (!token) return { ...headers };
+
+  return {
+    ...headers,
+    Authorization: `Bearer ${token}`,
+  };
+}
+
+async function apiFetch(path, options = {}) {
+  try {
+    const res = await fetch(API + path, {
+      ...options,
+      headers: withAuthHeaders(options.headers || {}),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    return res.json();
+  } catch (e) {
+    showToast('fa-solid fa-triangle-exclamation', e.message || 'Σφάλμα σύνδεσης');
+    throw e;
+  }
+}
+
+function apiGet(path) { return apiFetch(path); }
+function apiDelete(path) { return apiFetch(path, { method: 'DELETE' }); }
+function apiPost(path, body) { return apiFetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+function apiPut(path, body) { return apiFetch(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+
+async function loadData() {
+  const data = await apiGet('/data').catch(() => null);
+  if (!data) return;
+  state.balance = data.balance ?? 0;
+  state.savings = data.savings ?? 0;
+  state.transactions = data.transactions ?? [];
+  state.savingsGoals = data.goals ?? [];
+  state.debts = data.debts ?? [];
+}
+
+// ---- HELPERS ----
+function formatCurrency(n) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatDate(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 86400000);
+  if (diff === 0) return 'Σήμερα';
+  if (diff === 1) return 'Χθες';
+  if (diff < 7) return d.toLocaleDateString('el-GR', { weekday: 'long' });
+  return d.toLocaleDateString('el-GR', { month: 'short', day: 'numeric' });
+}
+
+function formatTime(iso) {
+  return new Date(iso).toLocaleTimeString('el-GR', { hour: 'numeric', minute: '2-digit' });
+}
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addDaysToDate(date, days) {
+  const d = startOfDay(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+function toDayKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function fromDayKey(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// ---- CATEGORIES ----
+const categories = {
+  expense: [
+    { id: 'food', name: 'Φαγητό', icon: 'fa-solid fa-burger', bg: '#FFF3E021' },
+    { id: 'coffee', name: 'Καφές', icon: 'fa-solid fa-mug-hot', bg: '#EFEBE921' },
+    { id: 'transport', name: 'Μεταφορά', icon: 'fa-solid fa-bus', bg: '#E3F2FD21' },
+    { id: 'books', name: 'Βιβλία', icon: 'fa-solid fa-book', bg: '#FCE4EC21' },
+    { id: 'entertainment', name: 'Διασκέδαση', icon: 'fa-solid fa-gamepad', bg: '#F3E5F521' },
+    { id: 'shopping', name: 'Ψώνια', icon: 'fa-solid fa-shirt', bg: '#E8F5E921' },
+    { id: 'subscriptions', name: 'Συνδρομές', icon: 'fa-solid fa-mobile-screen-button', bg: '#E0F7FA21' },
+    { id: 'health', name: 'Υγεία', icon: 'fa-solid fa-capsules', bg: '#FFF8E121' },
+    { id: 'utilities', name: 'Λογαριασμοί', icon: 'fa-solid fa-lightbulb', bg: '#FFFDE721' },
+    { id: 'rent', name: 'Ενοίκιο', icon: 'fa-solid fa-house', bg: '#F1F8E921' },
+    { id: 'other_expense', name: 'Άλλο', icon: 'fa-solid fa-thumbtack', bg: '#ECEFF121' },
+  ],
+  income: [
+    { id: 'job', name: 'Εργασία', icon: 'fa-solid fa-briefcase', bg: '#E8F5E9' },
+    { id: 'scholarship', name: 'Υποτροφία', icon: 'fa-solid fa-graduation-cap', bg: '#FFF8E121' },
+    { id: 'family', name: 'Οικογένεια', icon: 'fa-solid fa-people-group', bg: '#FCE4EC21' },
+    { id: 'freelance', name: 'Freelance', icon: 'fa-solid fa-sack-dollar', bg: '#F3E5F521' },
+    { id: 'aid', name: 'Ενίσχυση', icon: 'fa-solid fa-building-columns', bg: '#E3F2FD21' },
+    { id: 'gift', name: 'Δώρο', icon: 'fa-solid fa-gift', bg: '#FFF3E0' },
+    { id: 'refund', name: 'Επιστροφή', icon: 'fa-solid fa-rotate-left', bg: '#E0F7FA21' },
+    { id: 'other_income', name: 'Άλλο', icon: 'fa-solid fa-thumbtack', bg: '#ECEFF121' },
+  ],
+};
+
+function getCategoryInfo(id) {
+  const all = [...categories.expense, ...categories.income];
+  return all.find(c => c.id === id) || { icon: 'fa-solid fa-thumbtack', name: 'Άλλο', bg: '#eceff121' };
+}
+
+function sanitizeFaClass(iconClass, fallback = 'fa-solid fa-circle') {
+  if (typeof iconClass !== 'string') return fallback;
+  const trimmed = iconClass.trim();
+  if (!trimmed) return fallback;
+  if (!/^fa[a-z-]*\s+fa-[a-z0-9-]+(?:\s+fa-[a-z0-9-]+)*$/i.test(trimmed)) return fallback;
+  return trimmed;
+}
+
+function renderFaIcon(iconClass, fallback, extraClass = '') {
+  const safe = sanitizeFaClass(iconClass, fallback);
+  const cls = extraClass ? `${safe} ${extraClass}` : safe;
+  return `<i class="${cls}" aria-hidden="true"></i>`;
+}
+
+const FA_FREE_ICONS_URL = 'https://raw.githubusercontent.com/mehmetsahindev/FontAwesome-v6.4.2.json/refs/heads/master/fontawesome-v6.4.2-free.json';
+const FA_STYLE_TO_CLASS = {
+  solid: 'fa-solid',
+  regular: 'fa-regular',
+  brands: 'fa-brands',
+};
+const FA_ICON_PAGE_SIZE = 180;
+const FALLBACK_FREE_ICON_CLASSES = [
+  'fa-solid fa-bullseye',
+  'fa-solid fa-house',
+  'fa-solid fa-wallet',
+  'fa-solid fa-piggy-bank',
+  'fa-solid fa-briefcase',
+  'fa-solid fa-car',
+  'fa-solid fa-plane',
+  'fa-solid fa-bus',
+  'fa-solid fa-book',
+  'fa-solid fa-graduation-cap',
+  'fa-solid fa-gamepad',
+  'fa-solid fa-heart',
+  'fa-solid fa-dumbbell',
+  'fa-solid fa-cart-shopping',
+  'fa-solid fa-lightbulb',
+  'fa-solid fa-mobile-screen-button',
+  'fa-solid fa-camera',
+  'fa-solid fa-laptop',
+  'fa-solid fa-gift',
+  'fa-solid fa-star',
+  'fa-solid fa-gem',
+  'fa-solid fa-rocket',
+  'fa-solid fa-seedling',
+  'fa-solid fa-hand-holding-dollar',
+  'fa-brands fa-apple',
+  'fa-brands fa-google',
+  'fa-brands fa-paypal',
+  'fa-brands fa-amazon',
+  'fa-brands fa-github',
+  'fa-brands fa-linkedin',
+];
+
+let _faIconLoadPromise = null;
+
+function normalizeFreeFaIcons(rawIcons) {
+  const unique = new Set();
+  const normalized = [];
+
+  rawIcons.forEach(icon => {
+    if (!icon || !icon.className) return;
+    if (unique.has(icon.className)) return;
+    unique.add(icon.className);
+    normalized.push(icon);
+  });
+
+  normalized.sort((a, b) => {
+    if (a.style !== b.style) return a.style.localeCompare(b.style);
+    return a.name.localeCompare(b.name);
+  });
+
+  return normalized;
+}
+
+async function loadFreeFaIcons() {
+  if (state.faFreeIcons.length) return true;
+  if (_faIconLoadPromise) return _faIconLoadPromise;
+
+  state.faIconsLoading = true;
+
+  _faIconLoadPromise = (async () => {
+    try {
+      const res = await fetch(FA_FREE_ICONS_URL);
+      if (!res.ok) throw new Error('Could not load Font Awesome metadata');
+
+      const metadata = await res.json();
+      const icons = [];
+
+      // metadata = { solid: ["fa-house", ...], regular: [...], brands: [...] }
+      Object.entries(metadata || {}).forEach(([style, iconList]) => {
+        const styleClass = FA_STYLE_TO_CLASS[style];
+        if (!styleClass || !Array.isArray(iconList)) return;
+
+        iconList.forEach(iconName => {
+          const safeName = iconName.startsWith('fa-') ? iconName : `fa-${iconName}`;
+
+          icons.push({
+            className: `${styleClass} ${safeName}`,
+            name: safeName,
+            label: safeName.replace('fa-', '').replace(/-/g, ' '),
+            style,
+          });
+        });
+      });
+
+      state.faFreeIcons = normalizeFreeFaIcons(icons);
+
+      if (!state.faFreeIcons.length) {
+        throw new Error('No free icon metadata returned');
+      }
+
+      return true;
+    } catch (_err) {
+      console.log("err", _err);
+
+      state.faFreeIcons = normalizeFreeFaIcons(
+        FALLBACK_FREE_ICON_CLASSES.map(cls => ({
+          className: cls,
+          name: cls.split(' ').slice(1).join(' '),
+          label: cls,
+          style: cls.split(' ')[0].replace('fa-', ''),
+        }))
+      );
+
+      return false;
+    } finally {
+      state.faIconsLoading = false;
+      _faIconLoadPromise = null;
+    }
+  })();
+
+  return _faIconLoadPromise;
+}
+
+function updateGoalIconPreview() {
+  const input = document.getElementById('goal-icon-input');
+  const iconSlot = document.getElementById('goal-icon-preview-icon');
+  const textSlot = document.getElementById('goal-icon-preview-text');
+  const safeClass = sanitizeFaClass(input ? input.value : '', 'fa-solid fa-bullseye');
+
+  if (iconSlot) iconSlot.innerHTML = renderFaIcon(safeClass, 'fa-solid fa-bullseye');
+  if (textSlot) textSlot.textContent = safeClass.replace('fa-', '').replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase()).split(' ')
+  .slice(2)
+  .join(' ');
+}
+
+function renderFaIconGrid() {
+  const grid = document.getElementById('fa-icon-grid');
+  const countEl = document.getElementById('fa-picker-count');
+  const loadMoreBtn = document.getElementById('fa-picker-load-more');
+  const selected = sanitizeFaClass((document.getElementById('goal-icon-input') || {}).value || '', 'fa-solid fa-bullseye');
+
+  if (!grid) return;
+
+  const max = state.faIconPage * FA_ICON_PAGE_SIZE;
+  const visibleIcons = state.faFilteredFreeIcons.slice(0, max);
+
+  if (!visibleIcons.length) {
+    grid.innerHTML = '<div class="fa-picker-empty">Δεν βρέθηκαν εικονίδια.</div>';
+  } else {
+    grid.innerHTML = visibleIcons.map(icon => `
+      <button type="button" class="fa-picker-item ${icon.className === selected ? 'selected' : ''}" data-icon="${icon.className}" title="${icon.className}">
+        <span class="fa-picker-item-icon">${renderFaIcon(icon.className, 'fa-solid fa-circle')}</span>
+        <span class="fa-picker-item-name">${icon.name.replace('fa-', '').replace(/-/g, ' ').replace("icon", "").replace(/\b\w/g, char => char.toUpperCase())}</span>
+      </button>
+    `).join('');
+
+    grid.querySelectorAll('.fa-picker-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById('goal-icon-input');
+        const iconClass = sanitizeFaClass(btn.dataset.icon, 'fa-solid fa-bullseye');
+        if (input) input.value = iconClass;
+        updateGoalIconPreview();
+        closeFaIconPicker();
+      });
+    });
+  }
+
+  if (countEl) countEl.textContent = `${visibleIcons.length} / ${state.faFilteredFreeIcons.length}`;
+  if (loadMoreBtn) loadMoreBtn.style.display = visibleIcons.length < state.faFilteredFreeIcons.length ? 'block' : 'none';
+}
+
+function applyFaIconFilter(query = '') {
+  const q = String(query).trim().toLowerCase();
+  state.faIconQuery = q;
+
+  state.faFilteredFreeIcons = !q
+    ? [...state.faFreeIcons]
+    : state.faFreeIcons.filter(icon => (
+      icon.name.toLowerCase().includes(q)
+      || icon.className.toLowerCase().includes(q)
+      || icon.label.toLowerCase().includes(q)
+    ));
+
+  state.faIconPage = 1;
+  renderFaIconGrid();
+}
+
+async function openFaIconPicker() {
+  const modal = document.getElementById('fa-icon-picker-modal');
+  const loadingEl = document.getElementById('fa-picker-loading');
+  const searchEl = document.getElementById('fa-icon-search');
+  if (!modal) return;
+
+  state.faIconPickerOpen = true;
+  modal.classList.add('visible');
+  if (loadingEl) loadingEl.hidden = false;
+
+  const loadedFromMetadata = await loadFreeFaIcons();
+  if (!loadedFromMetadata) {
+    showToast('fa-solid fa-circle-info', 'Χωρίς internet: Έγινε φόρτωση βασικών icons');
+  }
+
+  if (loadingEl) loadingEl.hidden = true;
+  if (searchEl) {
+    searchEl.value = '';
+    searchEl.focus();
+  }
+  applyFaIconFilter('');
+}
+
+function closeFaIconPicker() {
+  const modal = document.getElementById('fa-icon-picker-modal');
+  if (!modal) return;
+  modal.classList.remove('visible');
+  state.faIconPickerOpen = false;
+}
+
+// ---- SVG ICONS ----
+const icons = {
+  home: '<svg viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  list: '<svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+  piggy: '<svg viewBox="0 0 24 24"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-3.5c1.3-1.2 2-2.7 2-4.5 0-2-1-3-1-3s1-1.5 1-3.5c0-.6-.5-1.5-1-1.5z" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14" cy="10" r="0.5" fill="currentColor" stroke="none"/></svg>',
+  users: '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  send: '<svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  download: '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  creditCard: '<svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
+  more: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/><circle cx="5" cy="12" r="1" fill="currentColor"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  delete: '<svg viewBox="0 0 24 24"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z" stroke-linecap="round" stroke-linejoin="round"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>',
+  edit: '<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  chevDown: '<svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  arrowUp: '<svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  arrowDown: '<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  chat: '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  wallet: '<svg viewBox="0 0 24 24"><path d="M21 12V7H5a2 2 0 010-4h14v4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 5v14a2 2 0 002 2h16v-5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 12a2 2 0 100 4h4v-4h-4z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+
+// ---- TIME ----
+function updateTime() {
+  const now = new Date();
+  const el = document.getElementById('status-time');
+  if (el) el.textContent = now.toLocaleTimeString('el-GR', { hour: 'numeric', minute: '2-digit', hour12: false });
+}
+
+// ---- NAVIGATION ----
+function switchView(viewId) {
+  if (viewId === state.currentView) return;
+  const oldView = document.querySelector('.view.active');
+  const newView = document.getElementById(viewId);
+  if (!oldView || !newView) return;
+
+  const tabs = ['home', 'transactions', 'savings', 'debts'];
+  const oldIdx = tabs.indexOf(state.currentView);
+  const newIdx = tabs.indexOf(viewId);
+
+  oldView.classList.remove('active');
+  if (newIdx > oldIdx) oldView.classList.add('exit-left');
+
+  setTimeout(() => {
+    oldView.classList.remove('exit-left');
+    oldView.style.transform = '';
+  }, 300);
+
+  newView.classList.add('active');
+  state.currentView = viewId;
+
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  const tabEl = document.querySelector(`[data-tab="${viewId}"]`);
+  if (tabEl) tabEl.classList.add('active');
+
+  renderView(viewId);
+  setupAnimateIn(newView);
+}
+
+function renderView(viewId) {
+  switch (viewId) {
+    case 'home': renderHome(); break;
+    case 'transactions': renderTransactions(); break;
+    case 'savings': renderSavings(); break;
+    case 'debts': renderDebts(); break;
+  }
+}
+
+// ---- HOME VIEW ----
+function renderHome() {
+  updateTime();
+  renderGreeting();
+  renderWeekCalendar();
+  renderPeopleRow();
+  renderBalanceCard();
+  renderFlowCard();
+  renderQuickActions();
+  renderStats();
+  renderRecentTransactions();
+}
+
+function renderGreeting() {
+  const el = document.getElementById('greeting-text');
+  if (el) el.textContent = `Γεια σου, ${state.user.name}!`;
+
+  const dateEl = document.getElementById('date-label');
+  if (dateEl) {
+    const selected = new Date(state.selectedDate);
+    dateEl.innerHTML = selected.toLocaleDateString('el-GR', { month: 'short', day: 'numeric', weekday: 'short' }) + ` ${icons.chevDown}`;
+  }
+}
+
+function renderWeekCalendar() {
+  const container = document.getElementById('week-days');
+  if (!container) return;
+
+  const today = startOfDay(new Date());
+  const selected = startOfDay(new Date(state.selectedDate));
+  const dayRangeBefore = 90;
+  const dayRangeAfter = 90;
+  const start = addDaysToDate(today, -dayRangeBefore);
+  let html = '';
+
+  for (let i = 0; i <= dayRangeBefore + dayRangeAfter; i++) {
+    const d = addDaysToDate(start, i);
+    const isToday = sameDay(d, today);
+    const isSelected = sameDay(d, selected);
+    const dayName = d.toLocaleDateString('el-GR', { weekday: 'narrow' });
+
+    html += `
+      <div class="week-day ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}" data-date-key="${toDayKey(d)}">
+        <span class="day-name">${dayName}</span>
+        <span class="day-num">${d.getDate()}</span>
+      </div>`;
+  }
+
+  container.innerHTML = html;
+
+  const centerSelected = (behavior = 'auto') => {
+    const active = container.querySelector('.week-day.selected') || container.querySelector('.week-day.today');
+    if (!active) return;
+
+    const left = active.offsetLeft - ((container.clientWidth - active.offsetWidth) / 2);
+    container.scrollTo({ left: Math.max(0, left), behavior });
+  };
+
+  container.querySelectorAll('.week-day').forEach(el => {
+    el.addEventListener('click', () => {
+      const key = el.dataset.dateKey;
+      if (!key) return;
+      state.selectedDate = fromDayKey(key);
+      renderWeekCalendar();
+      renderGreeting();
+      centerSelected('smooth');
+    });
+  });
+
+  requestAnimationFrame(() => centerSelected('auto'));
+}
+
+function renderPeopleRow() {
+  const container = document.getElementById('people-scroll');
+  if (!container) return;
+
+  const people = state.debts.slice(0, 3);
+  let html = '';
+
+  people.forEach(p => {
+    html += `
+      <div class="person-chip" data-id="${p.id}">
+        <div class="avatar" style="background: ${p.color}">${p.initial}</div>
+        <span>${p.name.split(' ')[0]}</span>
+      </div>`;
+  });
+
+  if (state.debts.length > 3) {
+    html += `
+      <div class="people-more" onclick="switchView('debts')">
+        <span>+${state.debts.length - 3}</span>
+        <div class="avatar-stack">
+          ${state.debts.slice(3, 6).map(p => `<div class="avatar" style="background:${p.color}">${p.initial}</div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+let _prevBalance = null;
+
+function renderBalanceCard() {
+  const amountEl = document.getElementById('balance-amount');
+  if (amountEl) {
+    // Animate on change
+    if (_prevBalance !== null && _prevBalance !== state.balance) {
+      amountEl.classList.remove('balance-animating');
+      void amountEl.offsetWidth; // force reflow
+      amountEl.classList.add('balance-animating');
+      amountEl.addEventListener('animationend', () => amountEl.classList.remove('balance-animating'), { once: true });
+    }
+    amountEl.textContent = formatCurrency(state.balance);
+    _prevBalance = state.balance;
+  }
+
+  // Mini income / expense stats
+  const { income, expenses } = getMonthTotals();
+  const incomeEl = document.getElementById('balance-income');
+  const expenseEl = document.getElementById('balance-expense');
+  if (incomeEl) incomeEl.textContent = `+${formatCurrency(income)}€`;
+  if (expenseEl) expenseEl.textContent = `-${formatCurrency(expenses)}€`;
+}
+
+function getMonthTotals() {
+  const now = new Date();
+  const monthTx = state.transactions.filter(t => {
+    const d = new Date(t.date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const income = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const expenses = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  return { income, expenses };
+}
+
+function renderFlowCard() {
+  const { income, expenses } = getMonthTotals();
+  const net = income - expenses;
+  const total = income + expenses;
+  const incomePct = total > 0 ? (income / total) * 100 : 0;
+  const expensePct = total > 0 ? (expenses / total) * 100 : 0;
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('flow-income-amount', `+${formatCurrency(income)}€`);
+  set('flow-expense-amount', `-${formatCurrency(expenses)}€`);
+  set('flow-period', new Date().toLocaleDateString('el-GR', { month: 'long' }));
+
+  const netEl = document.getElementById('flow-net-value');
+  if (netEl) {
+    netEl.textContent = `${net >= 0 ? '+' : '-'}${formatCurrency(Math.abs(net))}€`;
+    netEl.className = `flow-net-value ${net >= 0 ? 'positive' : 'negative'}`;
+  }
+
+  // Bars animate in after paint
+  requestAnimationFrame(() => {
+    const ib = document.getElementById('flow-income-bar');
+    const eb = document.getElementById('flow-expense-bar');
+    if (ib) ib.style.width = `${incomePct}%`;
+    if (eb) eb.style.width = `${expensePct}%`;
+  });
+}
+
+function renderQuickActions() {
+  // Static — already in HTML
+}
+
+function renderStats() {
+  const now = new Date();
+  const monthTx = state.transactions.filter(t => {
+    const d = new Date(t.date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+
+  const income = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const expenses = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const net = income - expenses;
+  const savingsRate = income > 0 ? ((state.savings / income) * 100) : 0;
+
+  const el = document.getElementById('stat-earnings');
+  if (el) el.textContent = `+${((income / (income || 1)) * 23.78).toFixed(2)}%`;
+
+  const savEl = document.getElementById('stat-savings');
+  if (savEl) savEl.textContent = `+${savingsRate.toFixed(2)}%`;
+
+  const invEl = document.getElementById('stat-investment');
+  if (invEl) invEl.textContent = `+${(net > 0 ? (net / income * 100) : 0).toFixed(2)}%`;
+
+  renderMiniChart();
+}
+
+function renderMiniChart() {
+  const container = document.getElementById('mini-chart');
+  if (!container) return;
+
+  const now = new Date();
+  let html = '';
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dayTx = state.transactions.filter(t => new Date(t.date).toDateString() === d.toDateString());
+    const total = dayTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    const h = Math.max(8, Math.min(100, (total / 80) * 100));
+    html += `<div class="bar ${i === 0 ? 'accent' : ''}" style="height:${h}%;animation-delay:${(6 - i) * 50}ms"></div>`;
+  }
+  container.innerHTML = html;
+}
+
+function renderRecentTransactions() {
+  const container = document.getElementById('recent-transactions');
+  if (!container) return;
+
+  if (state.transactions.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">${renderFaIcon('fa-solid fa-receipt', 'fa-solid fa-receipt')}</div>
+        <p>Δεν υπάρχουν συναλλαγές</p>
+      </div>`;
+    return;
+  }
+
+  const recent = state.transactions.slice(0, 4);
+  container.innerHTML = recent.map(t => transactionItemHTML(t)).join('');
+}
+
+function transactionItemHTML(t) {
+  const cat = getCategoryInfo(t.category);
+  const isExpense = t.type === 'expense';
+  const sign = isExpense ? '-' : '+';
+  const cls = isExpense ? 'expense' : 'income';
+
+  return `
+    <div class="transaction-item" data-id="${t.id}" onclick="toggleTransactionDetail(${t.id})">
+
+      <!-- ── Main row ── -->
+      <div class="transaction-main">
+        <div class="transaction-icon" style="background:${cat.bg}">${renderFaIcon(cat.icon, 'fa-solid fa-tag')}</div>
+        <div class="transaction-info">
+          <div class="name">${t.name}</div>
+          <div class="category">${cat.name} · ${formatDate(t.date)}</div>
+        </div>
+        <div class="transaction-amount">
+          <div class="amount ${cls}">${sign}${formatCurrency(t.amount)}€</div>
+          <div class="time">${formatTime(t.date)}</div>
+        </div>
+        <div class="transaction-chevron">
+          <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+
+      <!-- ── Inline detail panel ── -->
+      <div class="transaction-detail-panel">
+        <div class="panel-inner">
+          <div class="panel-body">
+            <div class="detail-field">
+              <span class="detail-key">Ποσό</span>
+              <span class="detail-val ${cls}">${sign}${formatCurrency(t.amount)}€</span>
+            </div>
+            <div class="detail-field">
+              <span class="detail-key">Ημ/νία &amp; Ώρα</span>
+              <span class="detail-val">${formatDate(t.date)} · ${formatTime(t.date)}</span>
+            </div>
+            <div class="detail-field">
+              <span class="detail-key">Κατηγορία</span>
+              <span class="detail-val">${renderFaIcon(cat.icon, 'fa-solid fa-tag', 'category-inline-icon')} ${cat.name}</span>
+            </div>
+            <div class="detail-field">
+              <span class="detail-key">Τύπος</span>
+              <span class="detail-val">${isExpense ? 'Έξοδο' : 'Εισόδημα'}</span>
+            </div>
+            ${t.note ? `<div class="detail-field">
+              <span class="detail-key">Σημείωση</span>
+              <span class="detail-val">${t.note}</span>
+            </div>` : ''}
+            <div class="panel-actions">
+              <button class="panel-delete-btn"
+                onclick="event.stopPropagation(); deleteTransaction(${t.id})">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                  <path d="M10 11v6M14 11v6"/>
+                  <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+                </svg>
+                Διαγραφή
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>`;
+}
+
+function toggleTransactionDetail(id) {
+  document.querySelectorAll('.transaction-item').forEach(el => {
+    if (parseInt(el.dataset.id) === id) {
+      el.classList.toggle('expanded');
+    } else {
+      el.classList.remove('expanded');
+    }
+  });
+}
+
+// ---- TRANSACTIONS VIEW ----
+function renderTransactions() {
+  renderTransactionFilters();
+  renderTransactionList();
+  renderMonthlySummary();
+}
+
+function renderTransactionFilters() {
+  const container = document.getElementById('filter-chips');
+  if (!container) return;
+
+  const filters = [
+    { id: 'all', label: 'Όλα' },
+    { id: 'income', label: 'Εισόδημα' },
+    { id: 'expense', label: 'Έξοδα' },
+    { id: 'food', label: `${renderFaIcon('fa-solid fa-burger', 'fa-solid fa-burger', 'chip-icon')} Φαγητό` },
+    { id: 'transport', label: `${renderFaIcon('fa-solid fa-bus', 'fa-solid fa-bus', 'chip-icon')} Μεταφορά` },
+    { id: 'entertainment', label: `${renderFaIcon('fa-solid fa-gamepad', 'fa-solid fa-gamepad', 'chip-icon')} Διασκέδαση` },
+    { id: 'shopping', label: `${renderFaIcon('fa-solid fa-shirt', 'fa-solid fa-shirt', 'chip-icon')} Ψώνια` },
+  ];
+
+  container.innerHTML = filters.map(f =>
+    `<div class="chip ${state.transactionFilter === f.id ? 'active' : ''}" data-filter="${f.id}">${f.label}</div>`
+  ).join('');
+
+  container.querySelectorAll('.chip').forEach(el => {
+    el.addEventListener('click', () => {
+      state.transactionFilter = el.dataset.filter;
+      renderTransactions();
+    });
+  });
+}
+
+function renderTransactionList() {
+  const container = document.getElementById('transaction-list');
+  if (!container) return;
+
+  let filtered = [...state.transactions];
+
+  if (state.searchQuery) {
+    const q = state.searchQuery.toLowerCase();
+    filtered = filtered.filter(t => t.name.toLowerCase().includes(q) || t.note.toLowerCase().includes(q));
+  }
+
+  if (state.transactionFilter === 'income') {
+    filtered = filtered.filter(t => t.type === 'income');
+  } else if (state.transactionFilter === 'expense') {
+    filtered = filtered.filter(t => t.type === 'expense');
+  } else if (state.transactionFilter !== 'all') {
+    filtered = filtered.filter(t => t.category === state.transactionFilter);
+  }
+
+  // Group by date
+  const groups = {};
+  filtered.forEach(t => {
+    const key = formatDate(t.date);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(t);
+  });
+
+  if (Object.keys(groups).length === 0) {
+    const isEmpty = state.transactions.length === 0;
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">${renderFaIcon(isEmpty ? 'fa-solid fa-receipt' : 'fa-solid fa-magnifying-glass', 'fa-solid fa-receipt')}</div>
+        <p>${isEmpty ? 'Δεν υπάρχουν συναλλαγές' : 'Δεν βρέθηκαν αποτελέσματα'}</p>
+      </div>`;
+    return;
+  }
+
+  let html = '';
+  Object.entries(groups).forEach(([date, txs]) => {
+    html += `<div class="date-group">
+      <div class="date-group-header">${date}</div>
+      <div class="transaction-list-inner">
+        ${txs.map(t => transactionItemHTML(t)).join('')}
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function renderMonthlySummary() {
+  const now = new Date();
+  const monthTx = state.transactions.filter(t => {
+    const d = new Date(t.date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+
+  const income = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const expenses = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+
+  const incomeEl = document.getElementById('summary-income');
+  const expenseEl = document.getElementById('summary-expense');
+  const netEl = document.getElementById('summary-net');
+
+  if (incomeEl) incomeEl.textContent = `+${formatCurrency(income)}€`;
+  if (expenseEl) expenseEl.textContent = `-${formatCurrency(expenses)}€`;
+  if (netEl) {
+    const net = income - expenses;
+    netEl.textContent = `${net >= 0 ? '+' : '-'}${formatCurrency(Math.abs(net))}€`;
+    netEl.className = `summary-value ${net >= 0 ? 'income' : 'expense'}`;
+  }
+}
+
+// ---- SAVINGS VIEW ----
+function renderSavings() {
+  renderSavingsBalances();
+  renderSavingsChart();
+  renderGoals();
+  renderSavingsTransferUI();
+  updateTransferSlider();
+}
+
+function renderSavingsBalances() {
+  const mainEl = document.getElementById('savings-main-balance');
+  const savingsEl = document.getElementById('savings-amount');
+  const trendEl = document.getElementById('savings-trend');
+  if (mainEl) mainEl.textContent = `${formatCurrency(state.balance)}€`;
+  if (savingsEl) savingsEl.textContent = `${formatCurrency(state.savings)}€`;
+  if (trendEl) trendEl.textContent = `Διαθέσιμο`;
+  // if (trendEl) trendEl.textContent = `+${formatCurrency(0)}€ αυτόν τον μήνα`;
+}
+
+function updateTransferSlider() {
+  const slider = document.getElementById('transfer-slider');
+  const maxLabel = document.getElementById('slider-max');
+  const sourceBalance = state.savingsTransferSource === 'savings' ? state.savings : state.balance;
+  if (maxLabel) maxLabel.textContent = `${formatCurrency(sourceBalance)}€`;
+  if (slider) slider.value = 0;
+  const inputEl = document.getElementById('transfer-amount');
+  if (inputEl) inputEl.value = '';
+}
+
+function renderSavingsTransferUI() {
+  document.querySelectorAll('.savings-account-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.account === state.savingsTransferSource);
+  });
+
+  const fromSavings = state.savingsTransferSource === 'savings';
+  const direction = fromSavings ? 'withdraw' : 'save';
+
+  const hintEl = document.getElementById('transfer-panel-hint');
+  if (hintEl) {
+    hintEl.textContent = fromSavings ? 'από αποταμιευσεις' : 'από κύριο υπόλοιπο';
+  }
+
+  const mainEl = document.getElementById('transfer-action-main');
+  if (mainEl) {
+    mainEl.textContent = fromSavings ? 'Ανάληψη' : 'Αποθήκευση';
+  }
+
+  const subEl = document.getElementById('transfer-action-sub');
+  if (subEl) {
+    subEl.textContent = fromSavings ? 'Αποταμιεύσεις → Κύριο' : 'Κύριο → Αποταμιεύσεις';
+  }
+
+  const btnEl = document.getElementById('transfer-action-btn');
+  if (btnEl) {
+    btnEl.classList.toggle('save', direction === 'save');
+    btnEl.classList.toggle('withdraw', direction === 'withdraw');
+  }
+
+  const iconEl = document.getElementById('transfer-action-icon');
+  if (iconEl) {
+    iconEl.innerHTML = direction === 'save'
+      ? '<path d="M5 12h14M15 8l4 4-4 4"/>'
+      : '<path d="M19 12H5M9 8l-4 4 4 4"/>';
+  }
+}
+
+function animateTransfer(direction) {
+  const rightArrow = document.querySelector('.xfer-arrow.xfer-right');
+  const leftArrow = document.querySelector('.xfer-arrow.xfer-left');
+  const mainCard = document.getElementById('main-balance-card');
+  const savCard = document.getElementById('savings-balance-card');
+
+  const arrow = direction === 'save' ? rightArrow : leftArrow;
+  const targetCard = direction === 'save' ? savCard : mainCard;
+
+  if (arrow) {
+    arrow.classList.remove('animating');
+    void arrow.offsetWidth;
+    arrow.classList.add('animating');
+    arrow.addEventListener('animationend', () => arrow.classList.remove('animating'), { once: true });
+  }
+  if (targetCard) {
+    targetCard.classList.remove('card-received');
+    void targetCard.offsetWidth;
+    targetCard.classList.add('card-received');
+    targetCard.addEventListener('animationend', () => targetCard.classList.remove('card-received'), { once: true });
+  }
+}
+
+function renderSavingsChart() {
+  const canvas = document.getElementById('savings-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.offsetWidth * 2;
+  const h = canvas.height = canvas.offsetHeight * 2;
+  ctx.scale(2, 2);
+
+  const dw = canvas.offsetWidth;
+  const dh = canvas.offsetHeight;
+
+  // Generate mock savings data for last 30 days
+  const data = [];
+  let val = state.savings - 150;
+  for (let i = 30; i >= 0; i--) {
+    val += (Math.random() - 0.3) * 15;
+    val = Math.max(val, state.savings * 0.6);
+    data.push(val);
+  }
+  data[data.length - 1] = state.savings;
+
+  const maxVal = Math.max(...data) * 1.1;
+  const minVal = Math.min(...data) * 0.9;
+  const range = maxVal - minVal;
+
+  // Draw gradient
+  const gradient = ctx.createLinearGradient(0, 0, 0, dh);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 0.21)');
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0.09)');
+
+  ctx.beginPath();
+  ctx.moveTo(0, dh);
+
+  data.forEach((v, i) => {
+    const x = (i / (data.length - 1)) * dw;
+    const y = dh - ((v - minVal) / range) * (dh - 20);
+    if (i === 0) ctx.lineTo(x, y);
+    else {
+      const prevX = ((i - 1) / (data.length - 1)) * dw;
+      const prevY = dh - ((data[i - 1] - minVal) / range) * (dh - 20);
+      const cpx = (prevX + x) / 2;
+      ctx.bezierCurveTo(cpx, prevY, cpx, y, x, y);
+    }
+  });
+
+  ctx.lineTo(dw, dh);
+  ctx.closePath();
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  // Draw line
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = (i / (data.length - 1)) * dw;
+    const y = dh - ((v - minVal) / range) * (dh - 20);
+    if (i === 0) ctx.moveTo(x, y);
+    else {
+      const prevX = ((i - 1) / (data.length - 1)) * dw;
+      const prevY = dh - ((data[i - 1] - minVal) / range) * (dh - 20);
+      const cpx = (prevX + x) / 2;
+      ctx.bezierCurveTo(cpx, prevY, cpx, y, x, y);
+    }
+  });
+  ctx.strokeStyle = '#1D1D1F';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Draw end dot
+  const lastX = dw;
+  const lastY = dh - ((data[data.length - 1] - minVal) / range) * (dh - 20);
+  ctx.beginPath();
+  ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#1D1D1F';
+  ctx.fill();
+}
+
+function renderGoals() {
+  const container = document.getElementById('goals-list');
+  if (!container) return;
+
+  if (state.savingsGoals.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">${renderFaIcon('fa-solid fa-bullseye', 'fa-solid fa-bullseye')}</div>
+        <p>Δεν υπάρχουν στόχοι</p>
+      </div>
+      <button class="add-goal-btn" onclick="openGoalSheet()">
+        ${icons.plus}
+        <span>Προσθήκη Στόχου</span>
+      </button>`;
+    return;
+  }
+
+  let html = state.savingsGoals.map(g => {
+    const pct = Math.round((g.current / g.target) * 100);
+    return `
+      <div class="goal-card" data-id="${g.id}">
+        <div class="goal-header">
+          <div class="goal-emoji">${renderFaIcon(g.icon || g.emoji, 'fa-solid fa-bullseye')}</div>
+          <div class="goal-percent">${pct}%</div>
+        </div>
+        <div class="goal-name">${g.name}</div>
+        <div class="goal-amounts">
+          <span>${formatCurrency(g.current)}€</span>
+          <span>από ${formatCurrency(g.target)}€</span>
+        </div>
+        <div class="goal-progress">
+          <div class="goal-progress-fill ${g.color}" style="width:${pct}%"></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  html += `
+    <button class="add-goal-btn" onclick="openGoalSheet()">
+      ${icons.plus}
+      <span>Προσθήκη Στόχου</span>
+    </button>`;
+
+  container.innerHTML = html;
+}
+
+// ---- DEBTS VIEW ----
+function renderDebts() {
+  renderDebtSummary();
+  renderDebtTabs();
+  renderDebtList();
+}
+
+function renderDebtSummary() {
+  const owed = state.debts.filter(d => d.type === 'owe').reduce((s, d) => s + d.amount, 0);
+  const lent = state.debts.filter(d => d.type === 'lent').reduce((s, d) => s + d.amount, 0);
+
+  const oweEl = document.getElementById('total-owed');
+  const lentEl = document.getElementById('total-lent');
+  if (oweEl) oweEl.textContent = `${formatCurrency(owed)}€`;
+  if (lentEl) lentEl.textContent = `${formatCurrency(lent)}€`;
+}
+
+function renderDebtTabs() {
+  document.querySelectorAll('.debt-tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === state.debtViewTab);
+  });
+}
+
+function renderDebtList() {
+  const container = document.getElementById('debt-list');
+  if (!container) return;
+
+  const filtered = state.debts.filter(d => d.type === state.debtViewTab);
+
+  if (filtered.length === 0) {
+    const isOwe = state.debtViewTab === 'owe';
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">${renderFaIcon(isOwe ? 'fa-solid fa-face-smile-beam' : 'fa-solid fa-money-bill-wave', 'fa-solid fa-circle-check')}</div>
+        <p>${isOwe ? 'Δεν χρωστάς σε κανέναν' : 'Κανείς δεν σου χρωστάει'}</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(d => `
+    <div class="debt-card" data-id="${d.id}">
+      <div class="debt-avatar-wrap">
+        <div class="avatar" style="background:${d.color}">${d.initial}</div>
+        <div class="debt-type-badge ${d.type}">${d.type === 'owe' ? 'Χρωστάω' : 'Δάνεισα'}</div>
+      </div>
+      <div class="debt-card-info">
+        <div class="name">${d.name}</div>
+        <div class="reason">${d.reason}</div>
+      </div>
+      <div class="debt-card-right">
+        <div class="debt-card-amount">
+          <div class="amount ${d.type}">${d.type === 'owe' ? '-' : '+'}${formatCurrency(d.amount)}€</div>
+          <div class="date">${formatDate(d.date)}</div>
+        </div>
+        <div class="debt-card-actions">
+          <button class="debt-action edit" onclick="editDebt(${d.id}, event)" title="Edit">
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="debt-action delete" onclick="deleteDebt(${d.id}, event)" title="Delete">
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ---- ADD TRANSACTION SHEET ----
+function openAddSheet() {
+  state.addSheetOpen = true;
+  state.amountStr = '';
+  state.selectedCategory = null;
+  state.addType = 'expense';
+
+  const overlay = document.getElementById('add-sheet-overlay');
+  overlay.classList.add('visible');
+
+  // Reset title field
+  const titleEl = document.getElementById('transaction-title');
+  if (titleEl) { titleEl.value = ''; titleEl.blur(); }
+  const counter = document.getElementById('tx-title-counter');
+  if (counter) counter.textContent = '0 / 40';
+
+  renderAddSheet();
+}
+
+function closeAddSheet() {
+  state.addSheetOpen = false;
+  const overlay = document.getElementById('add-sheet-overlay');
+  overlay.classList.remove('visible');
+}
+
+function renderAddSheet() {
+  renderTypeToggle();
+  renderAmountDisplay();
+  renderCategoryPicker();
+  updateSaveButton();
+}
+
+function renderTypeToggle() {
+  document.querySelectorAll('.type-toggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === state.addType);
+  });
+  // Stamp data attribute so CSS can color-code the active pill
+  const toggle = document.querySelector('.type-toggle');
+  if (toggle) toggle.dataset.activeType = state.addType;
+
+  renderCategoryPicker();
+  renderAmountDisplay(); // keep amount color in sync
+}
+
+function renderAmountDisplay() {
+  const el = document.getElementById('amount-value');
+  if (el) el.textContent = state.amountStr || '0';
+  // Color-code the entire amount display by transaction type
+  const display = document.querySelector('.amount-display');
+  if (display) display.dataset.txType = state.addType;
+}
+
+function renderCategoryPicker() {
+  const container = document.getElementById('category-grid');
+  if (!container) return;
+
+  const cats = categories[state.addType];
+  container.innerHTML = cats.map(c => `
+    <div class="category-item ${state.selectedCategory === c.id ? 'selected' : ''}" data-cat="${c.id}">
+      <div class="cat-icon" style="background:${c.bg}">${renderFaIcon(c.icon, 'fa-solid fa-tag')}</div>
+      <div class="cat-name">${c.name}</div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.category-item').forEach(el => {
+    el.addEventListener('click', () => {
+      state.selectedCategory = el.dataset.cat;
+      document.getElementById("transaction-title").value = getCategoryInfo(state.selectedCategory).name; // Auto-fill title with category name
+      document.getElementById("transaction-title").setAttribute("data-auto-filled", "true");
+      renderCategoryPicker();
+      updateSaveButton();
+    });
+  });
+}
+
+function handleNumpad(key) {
+  if (key === 'delete') {
+    state.amountStr = state.amountStr.slice(0, -1);
+  } else if (key === '.') {
+    if (!state.amountStr.includes('.')) {
+      state.amountStr += state.amountStr ? '.' : '0.';
+    }
+  } else {
+    // Limit decimal places to 2
+    const parts = state.amountStr.split('.');
+    if (parts[1] && parts[1].length >= 2) return;
+    // Limit total length
+    if (state.amountStr.replace('.', '').length >= 7) return;
+    state.amountStr += key;
+  }
+
+  renderAmountDisplay();
+  updateSaveButton();
+}
+
+function updateSaveButton() {
+  const btn = document.getElementById('save-transaction-btn');
+  if (!btn) return;
+  const amount = parseFloat(state.amountStr);
+  const title = (document.getElementById('transaction-title')?.value ?? '').trim();
+  const ready = !!(amount > 0 && state.selectedCategory && title);
+  const wasReady = !btn.disabled;
+
+  btn.disabled = !ready;
+
+  // Pulse the button the moment all three conditions are first satisfied
+  if (ready && !wasReady) {
+    btn.classList.remove('just-enabled');
+    void btn.offsetWidth; // reflow
+    btn.classList.add('just-enabled');
+    btn.addEventListener('animationend', () => btn.classList.remove('just-enabled'), { once: true });
+  }
+}
+
+async function saveTransaction() {
+  const amount = parseFloat(state.amountStr);
+  if (!amount || !state.selectedCategory) return;
+
+  const cat = getCategoryInfo(state.selectedCategory);
+  const title = (document.getElementById('transaction-title')?.value ?? '').trim();
+
+  const payload = {
+    name: title || cat.name,
+    category: state.selectedCategory,
+    type: state.addType,
+    amount,
+    date: new Date().toISOString(),
+    note: title,
+  };
+
+  const data = await apiPost('/transactions', payload).catch(() => null);
+  if (!data) return;
+
+  state.transactions.unshift(data.transaction);
+  state.balance = data.balance;
+
+  closeAddSheet();
+
+  const sign = state.addType === 'expense' ? '-' : '+';
+  const icon = state.addType === 'expense' ? 'fa-solid fa-money-bill-trend-up' : 'fa-solid fa-sack-dollar';
+  showToast(icon, `${data.transaction.name} — ${sign}${formatCurrency(amount)}€`);
+
+  renderView(state.currentView);
+}
+
+// ---- DEBT SHEET ----
+function openDebtSheet(debt = null) {
+  state.debtSheetOpen = true;
+  state.editingDebtId = debt ? debt.id : null;
+  state.debtType = debt ? debt.type : 'owe';
+
+  const overlay = document.getElementById('debt-sheet-overlay');
+  const header = overlay.querySelector('.sheet-header h2');
+  const saveBtn = overlay.querySelector('.save-btn');
+  if (header) header.textContent = debt ? 'Επεξεργασία Χρέους' : 'Προσθήκη Χρέους';
+  if (saveBtn) saveBtn.textContent = debt ? 'Αποθήκευση' : 'Προσθήκη Χρέους';
+
+  const nameEl = document.getElementById('debt-name');
+  const amountEl = document.getElementById('debt-amount');
+  const reasonEl = document.getElementById('debt-reason');
+  if (nameEl) nameEl.value = debt ? debt.name : '';
+  if (amountEl) amountEl.value = debt ? debt.amount : '';
+  if (reasonEl) reasonEl.value = (debt && debt.reason !== 'Χωρίς αιτία') ? debt.reason : '';
+
+  overlay.classList.add('visible');
+  renderDebtTypeToggle();
+}
+
+function closeDebtSheet() {
+  state.debtSheetOpen = false;
+  state.editingDebtId = null;
+  const overlay = document.getElementById('debt-sheet-overlay');
+  overlay.classList.remove('visible');
+}
+
+function renderDebtTypeToggle() {
+  document.querySelectorAll('.debt-type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === state.debtType);
+  });
+}
+
+async function saveDebt() {
+  const nameEl = document.getElementById('debt-name');
+  const amountEl = document.getElementById('debt-amount');
+  const reasonEl = document.getElementById('debt-reason');
+
+  const name = nameEl ? nameEl.value.trim() : '';
+  const amount = amountEl ? parseFloat(amountEl.value) : 0;
+  const reason = reasonEl ? reasonEl.value.trim() : '';
+
+  if (!name || !amount) {
+    showToast('fa-solid fa-triangle-exclamation', 'Συμπλήρωσε όνομα και ποσό');
+    return;
+  }
+
+  if (state.editingDebtId) {
+    const updated = await apiPut(`/debts/${state.editingDebtId}`, {
+      name,
+      initial: name.charAt(0).toUpperCase(),
+      type: state.debtType,
+      amount,
+      reason: reason || 'Χωρίς αιτία',
+    }).catch(() => null);
+    if (!updated) return;
+
+    const idx = state.debts.findIndex(d => d.id === state.editingDebtId);
+    if (idx !== -1) state.debts[idx] = updated;
+
+    closeDebtSheet();
+    showToast('fa-solid fa-circle-check', `Ενημερώθηκε ${name}`);
+    renderDebts();
+    renderPeopleRow();
+    return;
+  }
+
+  const colors = ['#FF9500', '#AF52DE', '#5AC8FA', '#FF2D55', '#30D158', '#007AFF', '#FFCC00', '#5856D6'];
+
+  const debt = await apiPost('/debts', {
+    name,
+    initial: name.charAt(0).toUpperCase(),
+    type: state.debtType,
+    amount,
+    reason: reason || 'Χωρίς αιτία',
+    date: new Date().toISOString(),
+    color: colors[Math.floor(Math.random() * colors.length)],
+  }).catch(() => null);
+  if (!debt) return;
+
+  state.debts.push(debt);
+  closeDebtSheet();
+  showToast('fa-solid fa-circle-check', `${state.debtType === 'owe' ? 'Χρέος' : 'Δάνειο'} προστέθηκε για ${name}`);
+  renderDebts();
+  renderPeopleRow();
+
+  if (nameEl) nameEl.value = '';
+  if (amountEl) amountEl.value = '';
+  if (reasonEl) reasonEl.value = '';
+}
+
+function editDebt(id, event) {
+  event.stopPropagation();
+  const debt = state.debts.find(d => d.id === id);
+  if (!debt) return;
+  openDebtSheet(debt);
+}
+
+async function deleteDebt(id, event) {
+  event.stopPropagation();
+  const debt = state.debts.find(d => d.id === id);
+  if (!debt) return;
+
+  await apiDelete(`/debts/${id}`).catch(() => null);
+
+  state.debts = state.debts.filter(d => d.id !== id);
+  showToast('fa-solid fa-trash', `Διαγράφηκε ${debt.name}`);
+  renderDebts();
+  renderPeopleRow();
+}
+
+// ---- GOAL SHEET ----
+function openGoalSheet() {
+  state.goalSheetOpen = true;
+  const overlay = document.getElementById('goal-sheet-overlay');
+  const iconInput = document.getElementById('goal-icon-input');
+  if (iconInput && !iconInput.value.trim()) {
+    iconInput.value = 'fa-solid fa-bullseye';
+  }
+  updateGoalIconPreview();
+  overlay.classList.add('visible');
+}
+
+function closeGoalSheet() {
+  state.goalSheetOpen = false;
+  const overlay = document.getElementById('goal-sheet-overlay');
+  overlay.classList.remove('visible');
+  closeFaIconPicker();
+}
+
+async function saveGoal() {
+  const nameEl = document.getElementById('goal-name-input');
+  const targetEl = document.getElementById('goal-target-input');
+  const iconEl = document.getElementById('goal-icon-input');
+
+  const name = nameEl ? nameEl.value.trim() : '';
+  const target = targetEl ? parseFloat(targetEl.value) : 0;
+  const icon = sanitizeFaClass(iconEl ? iconEl.value : '', 'fa-solid fa-bullseye');
+
+  if (!name || !target) {
+    showToast('fa-solid fa-triangle-exclamation', 'Συμπλήρωσε όνομα και στόχο');
+    return;
+  }
+
+  const colors = ['green', 'blue', 'orange', 'purple'];
+
+  const goal = await apiPost('/goals', {
+    name,
+    icon,
+    target,
+    current: 0,
+    color: colors[state.savingsGoals.length % colors.length],
+  }).catch(() => null);
+  if (!goal) return;
+
+  state.savingsGoals.push(goal);
+  closeGoalSheet();
+  showToast('fa-solid fa-bullseye', `Ο στόχος "${name}" δημιουργήθηκε`);
+  renderGoals();
+
+  if (nameEl) nameEl.value = '';
+  if (targetEl) targetEl.value = '';
+  if (iconEl) iconEl.value = 'fa-solid fa-bullseye';
+  updateGoalIconPreview();
+}
+
+// ---- SAVINGS TRANSFER ----
+async function handleTransfer() {
+  const direction = state.savingsTransferSource === 'savings' ? 'withdraw' : 'save';
+  return processSavingsTransfer(direction);
+}
+
+async function processSavingsTransfer(direction) {
+  const inputEl = document.getElementById('transfer-amount');
+  const amount = inputEl ? parseFloat(inputEl.value) : 0;
+  if (!amount || amount <= 0) return;
+
+  const fromSavings = direction === 'withdraw';
+  const sourceBalance = fromSavings ? state.savings : state.balance;
+  if (amount > sourceBalance) {
+    showToast(
+      'fa-solid fa-triangle-exclamation',
+      fromSavings ? 'Ανεπαρκείς αποταμιεύσεις' : 'Ανεπαρκές υπόλοιπο',
+    );
+    return;
+  }
+
+  const data = await apiPost('/transfer', { amount, direction }).catch(() => null);
+  if (!data) return;
+
+  state.balance = data.balance;
+  state.savings = data.savings;
+  state.savingsGoals = data.goals || state.savingsGoals;
+
+  animateTransfer(direction);
+  showToast(
+    'fa-solid fa-arrow-right-arrow-left',
+    direction === 'save'
+      ? `${formatCurrency(amount)}€ μεταφέρθηκαν στις αποταμιεύσεις`
+      : `${formatCurrency(amount)}€ επιστράφηκαν στο κύριο`,
+  );
+
+  const slider = document.getElementById('transfer-slider');
+  if (slider) slider.value = 0;
+  if (inputEl) inputEl.value = '';
+  renderSavings();
+  renderBalanceCard();
+}
+
+// ---- TRANSACTION DETAIL ----
+function showTransactionDetail(id) {
+  const tx = state.transactions.find(t => t.id === id);
+  if (!tx) return;
+
+  const cat = getCategoryInfo(tx.category);
+  const modal = document.getElementById('transaction-detail-modal');
+  if (!modal) return;
+
+  const isExpense = tx.type === 'expense';
+
+  modal.querySelector('.glass-modal-content').innerHTML = `
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:34px;margin-bottom:12px;line-height:1">${renderFaIcon(cat.icon, 'fa-solid fa-tag')}</div>
+      <div style="font-size:24px;font-weight:700;margin-bottom:4px;color:${isExpense ? 'var(--text-primary)' : 'var(--green)'}">
+        ${isExpense ? '-' : '+'}${formatCurrency(tx.amount)}€
+      </div>
+      <div style="font-size:15px;color:var(--text-secondary)">${tx.name}</div>
+    </div>
+    <div style="background:var(--bg);border-radius:14px;padding:16px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+        <span style="color:var(--text-tertiary);font-size:13px">Κατηγορία</span>
+        <span style="font-weight:500;font-size:14px">${cat.name}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+        <span style="color:var(--text-tertiary);font-size:13px">Ημερομηνία</span>
+        <span style="font-weight:500;font-size:14px">${formatDate(tx.date)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+        <span style="color:var(--text-tertiary);font-size:13px">Ώρα</span>
+        <span style="font-weight:500;font-size:14px">${formatTime(tx.date)}</span>
+      </div>
+      ${tx.note ? `<div style="display:flex;justify-content:space-between">
+        <span style="color:var(--text-tertiary);font-size:13px">Σημείωση</span>
+        <span style="font-weight:500;font-size:14px">${tx.note}</span>
+      </div>` : ''}
+    </div>
+    <button class="save-btn" style="background:var(--red);margin-bottom:8px" onclick="deleteTransaction(${tx.id})">Διαγραφή Συναλλαγής</button>
+    <button class="save-btn" style="background:var(--bg);color:var(--text-primary)" onclick="closeTransactionDetail()">Τέλος</button>
+  `;
+
+  modal.classList.add('visible');
+}
+
+function closeTransactionDetail() {
+  const modal = document.getElementById('transaction-detail-modal');
+  if (modal) modal.classList.remove('visible');
+}
+
+async function deleteTransaction(id) {
+  const data = await apiDelete(`/transactions/${id}`).catch(() => null);
+  if (!data) return;
+
+  state.transactions = state.transactions.filter(t => t.id !== id);
+  state.balance = data.balance;
+
+  closeTransactionDetail();
+  showToast('fa-solid fa-trash', 'Η συναλλαγή διαγράφηκε');
+  renderView(state.currentView);
+}
+
+// ---- TOAST ----
+function showToast(iconClass, message) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+
+  const iconEl = toast.querySelector('.toast-icon');
+  if (iconEl) iconEl.innerHTML = renderFaIcon(iconClass, 'fa-solid fa-circle-info');
+  toast.querySelector('.toast-message').textContent = message;
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 2500);
+}
+
+// ---- SEARCH ----
+function handleSearch(query) {
+  state.searchQuery = query;
+  renderTransactionList();
+}
+
+// ---- INIT ----
+async function init() {
+  const acc = localStorage.getItem('evx-account');
+  if (!acc) {
+    window.location.href = '/login/?login=tazro';
+    return;
+  }
+
+  const parsedAccount = JSON.parse(acc)
+  document.getElementById("evx-pfp").src = parsedAccount.pfp || 'tazro.png';
+
+  await loadData();
+
+  // Navigation
+  document.querySelectorAll('.tab-item').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const view = tab.dataset.tab;
+      if (view) {
+        switchView(view);
+      }
+    });
+  });
+
+  const addFab = document.getElementById('fab-add-btn');
+  if (addFab) {
+    addFab.addEventListener('click', openAddSheet);
+  }
+
+  // Type toggle
+  document.querySelectorAll('.type-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.addType = btn.dataset.type;
+      state.selectedCategory = null;
+      renderTypeToggle();
+      renderAmountDisplay();
+      updateSaveButton();
+    });
+  });
+
+  // Numpad
+  document.querySelectorAll('.numpad button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      handleNumpad(btn.dataset.key);
+    });
+  });
+
+  // Sheet overlays close
+  document.getElementById('add-sheet-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeAddSheet();
+  });
+  document.getElementById('debt-sheet-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeDebtSheet();
+  });
+  document.getElementById('goal-sheet-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeGoalSheet();
+  });
+  document.getElementById('transaction-detail-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeTransactionDetail();
+  });
+  document.getElementById('fa-icon-picker-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeFaIconPicker();
+  });
+
+  const faPickerCloseBtn = document.getElementById('fa-picker-close-btn');
+  if (faPickerCloseBtn) {
+    faPickerCloseBtn.addEventListener('click', closeFaIconPicker);
+  }
+
+  const faPickerSearch = document.getElementById('fa-icon-search');
+  if (faPickerSearch) {
+    faPickerSearch.addEventListener('input', (e) => applyFaIconFilter(e.target.value));
+  }
+
+  const faPickerLoadMore = document.getElementById('fa-picker-load-more');
+  if (faPickerLoadMore) {
+    faPickerLoadMore.addEventListener('click', () => {
+      state.faIconPage += 1;
+      renderFaIconGrid();
+    });
+  }
+
+  const goalIconInput = document.getElementById('goal-icon-input');
+  if (goalIconInput) {
+    document.getElementById("goal-icon-preview").addEventListener('click', openFaIconPicker);
+    goalIconInput.addEventListener('focus', openFaIconPicker);
+    goalIconInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openFaIconPicker();
+      }
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && state.faIconPickerOpen) {
+      closeFaIconPicker();
+    }
+  });
+
+  // Debt tabs
+  document.querySelectorAll('.debt-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      state.debtViewTab = tab.dataset.tab;
+      renderDebtTabs();
+      renderDebtList();
+    });
+  });
+
+  // Debt type toggle
+  document.querySelectorAll('.debt-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.debtType = btn.dataset.type;
+      renderDebtTypeToggle();
+    });
+  });
+
+  // Transaction title field — gates save button + drives character counter
+  const titleInput = document.getElementById('transaction-title');
+  if (titleInput) {
+    titleInput.addEventListener('input', () => {
+      updateSaveButton();
+      const counter = document.getElementById('tx-title-counter');
+      if (counter) counter.textContent = `${titleInput.value.length} / 40`;
+    });
+    // Prevent numpad key events from leaking into the text field
+    titleInput.addEventListener('keydown', e => e.stopPropagation());
+  }
+
+  // Search
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
+  }
+
+  // Transfer slider sync (0–100% of main balance)
+  const slider = document.getElementById('transfer-slider');
+  const transferInput = document.getElementById('transfer-amount');
+  if (slider && transferInput) {
+    slider.addEventListener('input', () => {
+      const pct = slider.value / 100;
+      const sourceBalance = state.savingsTransferSource === 'savings' ? state.savings : state.balance;
+      const amount = Math.round(sourceBalance * pct * 100) / 100;
+      transferInput.value = amount > 0 ? amount.toFixed(2) : '';
+    });
+  }
+  // Keep the slider max label in sync when input is typed manually
+  if (transferInput) {
+    transferInput.addEventListener('input', () => {
+      const sourceBalance = state.savingsTransferSource === 'savings' ? state.savings : state.balance;
+      const maxLabel = document.getElementById('slider-max');
+      if (maxLabel) maxLabel.textContent = `${formatCurrency(sourceBalance)}€`;
+    });
+  }
+
+  // Savings transfer source toggle
+  document.querySelectorAll('.savings-account-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.savingsTransferSource = btn.dataset.account === 'savings' ? 'savings' : 'main';
+      renderSavingsTransferUI();
+      updateTransferSlider();
+    });
+  });
+
+  // Quick actions
+  document.querySelectorAll('.action-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const action = item.dataset.action;
+      if (action === 'send' || action === 'pay') {
+        state.addType = 'expense';
+        openAddSheet();
+      } else if (action === 'request') {
+        state.addType = 'income';
+        openAddSheet();
+      } else if (action === 'more') {
+        switchView('transactions');
+      }
+    });
+  });
+
+  // Update time every minute
+  updateTime();
+  setInterval(updateTime, 60000);
+
+  // Initial render
+  renderHome();
+  updateGoalIconPreview();
+
+  // Animate in
+  setupAnimateIn(document.getElementById('home'));
+}
+
+function setupAnimateIn(container) {
+  const elements = Array.from((container || document).querySelectorAll('.animate-in'));
+  elements.forEach(el => {
+    el.classList.remove('visible');
+    el.style.animationDelay = '';
+  });
+
+  const observer = new IntersectionObserver((entries) => {
+    const entering = entries.filter(e => e.isIntersecting);
+    entering.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+    entering.forEach((entry, i) => {
+      entry.target.style.animationDelay = `${i * 60}ms`;
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: 0.1 });
+
+  elements.forEach(el => observer.observe(el));
+}
+
+// Start
+document.addEventListener('DOMContentLoaded', init);
+
+
+document.getElementById("transaction-title").addEventListener("focus", function () {
+  if (this.getAttribute("data-auto-filled") === "true") {
+    this.value = "";
+    this.setAttribute("data-auto-filled", "false");
+  }
+})

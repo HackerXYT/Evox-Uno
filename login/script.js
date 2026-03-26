@@ -35,7 +35,7 @@ function twoFactorAuthCheck() {
         return;
     }
 
-    fetch("http://localhost:3000/2FA", {
+    fetch("https://uno.evox.uno/2FA", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -52,8 +52,40 @@ function twoFactorAuthCheck() {
             if (data.success) {
                 document.getElementById('login').style.display = 'none';
                 document.getElementById('2fa').style.display = 'none';
-                document.getElementById("loading").style.display = 'flex'
-                redirect()
+                if (isTazro) {
+                    document.getElementById("signintext").innerText = 'Getting your Tazro account ready...'
+                    document.getElementById("loading").style.display = 'flex'
+                    const name = tempAccount.name !== "Unknown" ? tempAccount.name.split(" ")[0] : tempAccount.username
+                    const tazroData = {
+                        user: { name, initial: name[0] },
+                        balance: 0,
+                        savings: 0,
+                        currentView: 'home',
+                        selectedDate: new Date(),
+                        addSheetOpen: false,
+                        debtSheetOpen: false,
+                        goalSheetOpen: false,
+                        addType: 'expense',
+                        amountStr: '',
+                        selectedCategory: null,
+                        debtType: 'owe',
+                        debtViewTab: 'owe',
+                        editingDebtId: null,
+                        transactionFilter: 'all',
+                        searchQuery: '',
+                        transactions: [],
+                        savingsGoals: [],
+                        debts: [],
+                    }
+                    localStorage.setItem("tazroState", JSON.stringify(tazroData, null, 2))
+                    setTimeout(function () {
+                        redirect()
+                    }, 3000)
+                } else {
+                    document.getElementById("loading").style.display = 'flex'
+                    redirect()
+                }
+
             } else {
                 alert("Login failed: " + (data.msg || data.message || "Unknown error"));
             }
@@ -68,7 +100,7 @@ function login() {
         alert("Please enter both email and password.");
         return;
     }
-    fetch("http://localhost:3000/login", {
+    fetch("https://uno.evox.uno/login", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -87,7 +119,8 @@ function login() {
                 username: data.username,
                 password: password,
                 evxToken: data.evxToken,
-                complete: data
+                complete: data,
+                name: data.name
             };
             if (data.success) {
                 if (data.twofactordone === true) {
@@ -108,7 +141,33 @@ function login() {
 
 function redirect() {
     localStorage.setItem("evx-account", JSON.stringify(tempAccount.complete, null, 2))
-    setTimeout(function () {
-        window.location.href = '/'
-    }, 2000)
+
+    if (isTazro) {
+        setTimeout(function () {
+            window.location.href = '/Tazro'
+        }, 2000)
+    } else {
+        setTimeout(function () {
+            window.location.href = '/'
+        }, 2000)
+    }
+
 }
+
+let isTazro = false;
+document.addEventListener('DOMContentLoaded', function () {
+    const params = new URLSearchParams(window.location.search);
+
+    const login = params.get('login');
+    if (login === 'tazro') {
+        isTazro = true;
+        document.getElementById("logo-row").querySelectorAll("*").forEach(el => el.style.display = 'flex');
+        document.getElementById("heading").innerText = "Login to continue on Tazro"
+    }
+
+    setTimeout(() => {
+        document.getElementById("loading-main").style.opacity = '0';
+        document.getElementById("loading-main").style.display = 'none';
+        document.querySelectorAll("main").forEach(el => el.style.opacity = '1');
+    }, 330)
+})

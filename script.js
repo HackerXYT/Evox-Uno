@@ -23,7 +23,7 @@ function setUnoProgress(value) {
 }
 
 
-fetch("http://localhost:3000/uno-progress", {
+fetch("https://uno.evox.uno/uno-progress", {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
