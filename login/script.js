@@ -122,12 +122,45 @@ function login() {
                 complete: data,
                 name: data.name
             };
+            return;
             if (data.success) {
                 if (data.twofactordone === true) {
                     document.getElementById('login').style.display = 'none';
                     document.getElementById('2fa').style.display = 'none';
                     document.getElementById("loading").style.display = 'flex'
-                    redirect()
+                    if (isTazro) {
+                        document.getElementById("signintext").innerText = 'Getting your Tazro account ready...'
+                        document.getElementById("loading").style.display = 'flex'
+                        const name = tempAccount.name !== "Unknown" ? tempAccount.name.split(" ")[0] : tempAccount.username
+                        const tazroData = {
+                            user: { name, initial: name[0] },
+                            balance: 0,
+                            savings: 0,
+                            currentView: 'home',
+                            selectedDate: new Date(),
+                            addSheetOpen: false,
+                            debtSheetOpen: false,
+                            goalSheetOpen: false,
+                            addType: 'expense',
+                            amountStr: '',
+                            selectedCategory: null,
+                            debtType: 'owe',
+                            debtViewTab: 'owe',
+                            editingDebtId: null,
+                            transactionFilter: 'all',
+                            searchQuery: '',
+                            transactions: [],
+                            savingsGoals: [],
+                            debts: [],
+                        }
+                        localStorage.setItem("tazroState", JSON.stringify(tazroData, null, 2))
+                        setTimeout(function () {
+                            redirect()
+                        }, 3000)
+                    } else {
+                        document.getElementById("loading").style.display = 'flex'
+                        redirect()
+                    }
                 } else {
                     document.getElementById("greeting").innerText = `Welcome back, ${data.name !== "Unknown" ? data.name.split(" ")[0] : data.username}`
                     twoFactorAuth();
