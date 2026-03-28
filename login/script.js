@@ -122,7 +122,6 @@ function login() {
                 complete: data,
                 name: data.name
             };
-            return;
             if (data.success) {
                 if (data.twofactordone === true) {
                     document.getElementById('login').style.display = 'none';
