@@ -123,7 +123,7 @@ function login() {
                 name: data.name
             };
             if (data.success) {
-                if (data.twofactordone === true && false) {
+                if (data.twofactordone === true) {
                     document.getElementById('login').style.display = 'none';
                     document.getElementById('2fa').style.display = 'none';
                     document.getElementById("loading").style.display = 'flex'
