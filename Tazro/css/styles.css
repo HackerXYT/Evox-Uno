@@ -520,7 +520,16 @@ img {
   color: #fff;
 }
 
-
+.week-day.today {
+  background: #e0e0e0;
+  color: #121212 !important;
+}
+.week-day.today .day-name {
+  color: #7b7b85;
+}
+.week-day.today .day-num {
+  color: #121212;
+}
 /* People/Contacts Row */
 .people-row {
   padding: 0 var(--space-lg);
@@ -1290,11 +1299,11 @@ img {
 /* Savings Chart */
 .savings-chart {
   margin: 0 var(--space-lg) var(--space-lg);
-  padding: var(--space-lg);
+  padding: 0;
   background: var(--surface);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
-  height: 180px;
+  height: 190px;
   position: relative;
   overflow: hidden;
 }
@@ -1730,7 +1739,7 @@ img {
   display: flex;
   gap: 2px;
   margin: var(--space-base) var(--space-lg);
-  background: var(--bg-secondary);
+  background: #2b2b2b;
   border-radius: var(--radius-sm);
   padding: 3px;
 }

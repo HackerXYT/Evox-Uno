@@ -50,6 +50,21 @@ const state = {
   },
 };
 
+// ---- SAVINGS HISTORY ----
+const SAVINGS_HISTORY_KEY = 'tazroSavingsHistory';
+
+function recordSavingsSnapshot() {
+  let history = [];
+  try { history = JSON.parse(localStorage.getItem(SAVINGS_HISTORY_KEY)) || []; } catch {}
+  history.push({ date: new Date().toISOString(), savings: state.savings });
+  if (history.length > 90) history = history.slice(-90);
+  localStorage.setItem(SAVINGS_HISTORY_KEY, JSON.stringify(history));
+}
+
+function getSavingsHistory() {
+  try { return JSON.parse(localStorage.getItem(SAVINGS_HISTORY_KEY)) || []; } catch { return []; }
+}
+
 // ---- API ----
 const API = 'https://uno.evox.uno/tazro';
 
@@ -99,6 +114,9 @@ async function loadData() {
   state.transactions = data.transactions ?? [];
   state.savingsGoals = data.goals ?? [];
   state.debts = data.debts ?? [];
+
+  // Seed savings history on first run so the chart always has a starting point
+  if (getSavingsHistory().length === 0) recordSavingsSnapshot();
 }
 
 // ---- HELPERS ----
@@ -164,12 +182,12 @@ const categories = {
     { id: 'other_expense', name: 'Άλλο', icon: 'fa-solid fa-thumbtack', bg: '#ECEFF121' },
   ],
   income: [
-    { id: 'job', name: 'Εργασία', icon: 'fa-solid fa-briefcase', bg: '#E8F5E9' },
+    { id: 'job', name: 'Εργασία', icon: 'fa-solid fa-briefcase', bg: '#E8F5E921' },
     { id: 'scholarship', name: 'Υποτροφία', icon: 'fa-solid fa-graduation-cap', bg: '#FFF8E121' },
     { id: 'family', name: 'Οικογένεια', icon: 'fa-solid fa-people-group', bg: '#FCE4EC21' },
     { id: 'freelance', name: 'Freelance', icon: 'fa-solid fa-sack-dollar', bg: '#F3E5F521' },
     { id: 'aid', name: 'Ενίσχυση', icon: 'fa-solid fa-building-columns', bg: '#E3F2FD21' },
-    { id: 'gift', name: 'Δώρο', icon: 'fa-solid fa-gift', bg: '#FFF3E0' },
+    { id: 'gift', name: 'Δώρο', icon: 'fa-solid fa-gift', bg: '#FFF3E021' },
     { id: 'refund', name: 'Επιστροφή', icon: 'fa-solid fa-rotate-left', bg: '#E0F7FA21' },
     { id: 'other_income', name: 'Άλλο', icon: 'fa-solid fa-thumbtack', bg: '#ECEFF121' },
   ],
@@ -545,6 +563,7 @@ function renderWeekCalendar() {
       state.selectedDate = fromDayKey(key);
       renderWeekCalendar();
       renderGreeting();
+      renderRecentTransactions();
       centerSelected('smooth');
     });
   });
@@ -689,18 +708,32 @@ function renderMiniChart() {
 
 function renderRecentTransactions() {
   const container = document.getElementById('recent-transactions');
+  const titleEl = document.getElementById('recent-title');
   if (!container) return;
 
-  if (state.transactions.length === 0) {
+  const selectedDate = startOfDay(new Date(state.selectedDate));
+  const today = startOfDay(new Date());
+  const isTodaySelected = sameDay(selectedDate, today);
+  const selectedLabel = selectedDate.toLocaleDateString('el-GR', { day: 'numeric', month: 'long' });
+
+  if (titleEl) {
+    titleEl.textContent = isTodaySelected ? 'Πρόσφατα' : `Συναλλαγές ${selectedLabel}`;
+  }
+
+  const sourceTransactions = isTodaySelected
+    ? state.transactions
+    : state.transactions.filter(t => sameDay(new Date(t.date), selectedDate));
+
+  if (sourceTransactions.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">${renderFaIcon('fa-solid fa-receipt', 'fa-solid fa-receipt')}</div>
-        <p>Δεν υπάρχουν συναλλαγές</p>
+        <p>${isTodaySelected ? 'Δεν υπάρχουν συναλλαγές' : 'Δεν υπάρχουν συναλλαγές για αυτή την ημέρα'}</p>
       </div>`;
     return;
   }
 
-  const recent = state.transactions.slice(0, 4);
+  const recent = sourceTransactions.slice(0, 4);
   container.innerHTML = recent.map(t => transactionItemHTML(t)).join('');
 }
 
@@ -981,76 +1014,122 @@ function renderSavingsChart() {
   const canvas = document.getElementById('savings-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  const w = canvas.width = canvas.offsetWidth * 2;
-  const h = canvas.height = canvas.offsetHeight * 2;
-  ctx.scale(2, 2);
-
   const dw = canvas.offsetWidth;
   const dh = canvas.offsetHeight;
+  canvas.width = dw * 2;
+  canvas.height = dh * 2;
+  ctx.scale(2, 2);
+  ctx.clearRect(0, 0, dw, dh);
 
-  // Generate mock savings data for last 30 days
-  const data = [];
-  let val = state.savings - 150;
-  for (let i = 30; i >= 0; i--) {
-    val += (Math.random() - 0.3) * 15;
-    val = Math.max(val, state.savings * 0.6);
-    data.push(val);
+  // --- Build 5 weekly data points from real snapshot history ---
+  const history = getSavingsHistory(); // [{date: ISO, savings: number}, ...]
+  const now = new Date();
+
+  // For each of the 5 columns (4w ago → now), find the latest snapshot at or before that moment.
+  // Column 0 = 4 weeks ago, column 4 = now.
+  const values = [];
+  for (let w = 4; w >= 0; w--) {
+    if (w === 0) {
+      values.push(state.savings);
+    } else {
+      const cutoff = new Date(now);
+      cutoff.setDate(now.getDate() - w * 7);
+      // Latest snapshot at or before the cutoff
+      const snap = [...history].filter(s => new Date(s.date) <= cutoff).pop();
+      // If no snapshot that far back, use the earliest one we have
+      values.push(snap ? snap.savings : (history.length > 0 ? history[0].savings : state.savings));
+    }
   }
-  data[data.length - 1] = state.savings;
 
-  const maxVal = Math.max(...data) * 1.1;
-  const minVal = Math.min(...data) * 0.9;
-  const range = maxVal - minVal;
+  // --- Layout ---
+  const PL = 10, PR = 10, PT = 26, PB = 22;
+  const chartW = dw - PL - PR;
+  const chartH = dh - PT - PB;
+  const n = values.length; // 5
+  const maxV = Math.max(...values);
+  const minVal = Math.min(...values) * 0.88;
+  const range = (maxV - minVal) || 1;
 
-  // Draw gradient
-  const gradient = ctx.createLinearGradient(0, 0, 0, dh);
-  gradient.addColorStop(0, 'rgba(255, 255, 255, 0.21)');
-  gradient.addColorStop(1, 'rgba(255, 255, 255, 0.09)');
+  const xs = values.map((_, i) => PL + (i / (n - 1)) * chartW);
+  const ys = values.map(val => PT + chartH - ((val - minVal) / range) * chartH);
 
-  ctx.beginPath();
-  ctx.moveTo(0, dh);
+  const deltas = values.slice(1).map((v, i) => v - values[i]);
+  const maxChange = Math.max(...deltas.map(Math.abs), 1);
+  const MAX_THICK = Math.min(chartH * 0.38, 32);
+  const flatThick = 6; // minimum ribbon thickness for flat / no-change weeks
 
-  data.forEach((v, i) => {
-    const x = (i / (data.length - 1)) * dw;
-    const y = dh - ((v - minVal) / range) * (dh - 20);
-    if (i === 0) ctx.lineTo(x, y);
-    else {
-      const prevX = ((i - 1) / (data.length - 1)) * dw;
-      const prevY = dh - ((data[i - 1] - minVal) / range) * (dh - 20);
-      const cpx = (prevX + x) / 2;
-      ctx.bezierCurveTo(cpx, prevY, cpx, y, x, y);
-    }
-  });
+  // --- Draw Sankey ribbons ---
+  for (let i = 0; i < n - 1; i++) {
+    const delta = deltas[i];
+    const thick = Math.max(flatThick, (Math.abs(delta) / maxChange) * MAX_THICK);
+    const isUp = delta >= 0;
+    const [r, g, b] = isUp ? [52, 199, 89] : [255, 59, 48];
 
-  ctx.lineTo(dw, dh);
-  ctx.closePath();
-  ctx.fillStyle = gradient;
-  ctx.fill();
+    const x0 = xs[i], y0 = ys[i];
+    const x1 = xs[i + 1], y1 = ys[i + 1];
+    const cpx = (x0 + x1) / 2;
 
-  // Draw line
-  ctx.beginPath();
-  data.forEach((v, i) => {
-    const x = (i / (data.length - 1)) * dw;
-    const y = dh - ((v - minVal) / range) * (dh - 20);
-    if (i === 0) ctx.moveTo(x, y);
-    else {
-      const prevX = ((i - 1) / (data.length - 1)) * dw;
-      const prevY = dh - ((data[i - 1] - minVal) / range) * (dh - 20);
-      const cpx = (prevX + x) / 2;
-      ctx.bezierCurveTo(cpx, prevY, cpx, y, x, y);
-    }
-  });
-  ctx.strokeStyle = '#1D1D1F';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x0, y0 - thick / 2);
+    ctx.bezierCurveTo(cpx, y0 - thick / 2, cpx, y1 - thick / 2, x1, y1 - thick / 2);
+    ctx.lineTo(x1, y1 + thick / 2);
+    ctx.bezierCurveTo(cpx, y1 + thick / 2, cpx, y0 + thick / 2, x0, y0 + thick / 2);
+    ctx.closePath();
 
-  // Draw end dot
-  const lastX = dw;
-  const lastY = dh - ((data[data.length - 1] - minVal) / range) * (dh - 20);
-  ctx.beginPath();
-  ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+    const grad = ctx.createLinearGradient(x0, 0, x1, 0);
+    grad.addColorStop(0,   `rgba(${r},${g},${b},0.30)`);
+    grad.addColorStop(0.5, `rgba(${r},${g},${b},0.58)`);
+    grad.addColorStop(1,   `rgba(${r},${g},${b},0.30)`);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(x0, y0 - thick / 2);
+    ctx.bezierCurveTo(cpx, y0 - thick / 2, cpx, y1 - thick / 2, x1, y1 - thick / 2);
+    ctx.strokeStyle = `rgba(${r},${g},${b},0.85)`;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  // --- Node dots ---
+  for (let i = 0; i < n; i++) {
+    const isLast = i === n - 1;
+    ctx.beginPath();
+    ctx.arc(xs[i], ys[i], isLast ? 5 : 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = isLast ? '#1D1D1F' : 'rgba(29,29,31,0.50)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // --- Week labels ---
+  const labels = ['4w', '3w', '2w', '1w', 'Now'];
+  ctx.fillStyle = 'rgba(60,60,67,0.5)';
+  ctx.font = '9px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  for (let i = 0; i < n; i++) ctx.fillText(labels[i], xs[i], dh - 5);
+
+  // --- Start / end amount labels ---
+  ctx.fillStyle = 'rgba(60,60,67,0.55)';
+  ctx.font = '9px Inter, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${formatCurrency(values[0])}€`, xs[0], PT - 8);
+
   ctx.fillStyle = '#1D1D1F';
-  ctx.fill();
+  ctx.font = 'bold 11px Inter, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${formatCurrency(state.savings)}€`, xs[n - 1], PT - 8);
+
+  // --- Monthly trend label ---
+  const totalDelta = values[n - 1] - values[0];
+  const sign = totalDelta >= 0 ? '+' : '';
+  const pct = values[0] > 0 ? ((totalDelta / values[0]) * 100).toFixed(1) : '0.0';
+  const [tr, tg, tb] = totalDelta >= 0 ? [52, 199, 89] : [255, 59, 48];
+  ctx.fillStyle = `rgb(${tr},${tg},${tb})`;
+  ctx.font = 'bold 10px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${sign}${pct}% τον Μήνα`, dw / 2, PT - 8);
 }
 
 function renderGoals() {
@@ -1507,6 +1586,7 @@ async function processSavingsTransfer(direction) {
   state.savings = data.savings;
   state.savingsGoals = data.goals || state.savingsGoals;
 
+  recordSavingsSnapshot();
   animateTransfer(direction);
   showToast(
     'fa-solid fa-arrow-right-arrow-left',
