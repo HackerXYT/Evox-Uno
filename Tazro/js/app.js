@@ -504,6 +504,414 @@ function renderView(viewId) {
   }
 }
 
+// ---- AI INSIGHTS ----
+
+/**
+ * Toggles the forecast card between collapsed and expanded states.
+ */
+function toggleForecastCard() {
+  const card = document.getElementById('ai-forecast-card');
+  if (card) card.classList.toggle('collapsed');
+}
+
+/**
+ * Shows the hidden tips (called when user taps "Δείτε περισσότερα").
+ */
+function showMoreTips() {
+  const btn = document.getElementById('ai-tips-more-btn');
+  document.querySelectorAll('#ai-tips-list .ai-tip-card.ai-tip-hidden').forEach((el, i) => {
+    el.classList.remove('ai-tip-hidden');
+    el.style.animationDelay = `${i * 80}ms`;
+  });
+  if (btn) btn.remove();
+}
+
+/**
+ * Routes a tip action button to the correct in-app screen or feature.
+ * @param {string} type - One of: 'view_spending', 'view_debts', 'view_savings', 'set_limit'
+ */
+function handleTipAction(type) {
+  switch (type) {
+    case 'view_spending': switchView('transactions'); break;
+    case 'view_debts':    switchView('debts'); break;
+    case 'view_savings':  switchView('savings'); break;
+    case 'set_limit':
+      showToast('fa-solid fa-circle-info', 'Δυνατότητα σύντομα διαθέσιμη');
+      break;
+  }
+}
+
+// ---- AI FUNCTIONS (mock implementations — replace bodies with real API calls) ----
+
+/**
+ * Returns a 7-day balance forecast based on the user's financial data.
+ *
+ * PROMPT TO SEND TO AI:
+ * ──────────────────────────────────────────────────────────────
+ * You are a personal finance assistant for students.
+ * Analyze the user's financial data and predict their balance for the next 7 days.
+ *
+ * User data (JSON): {{ userData }}
+ *
+ * Return ONLY valid JSON (no markdown) with this exact shape:
+ * {
+ *   "balances": [number, number, number, number, number, number, number],
+ *   "events": [
+ *     { "day": 0-6, "label": "<short Greek label>", "type": "warn"|"income"|"expense" }
+ *   ],
+ *   "insight": "<one sentence in Greek, max 90 chars, personal and specific>"
+ * }
+ *
+ * Rules:
+ * - balances[0] = today's starting balance (before daily spend)
+ * - Use each pending payment's dueDate to apply it on the correct day offset
+ * - Estimate daily spend from the average of recent expense transactions
+ * - Flag days where balance drops below 10€ as { type: "warn" }
+ * - Flag days with incoming payments as { type: "income" }
+ * - insight must be in Greek, feel personal, mention real amounts from the data
+ * ──────────────────────────────────────────────────────────────
+ *
+ * @param {object} userData - Full user financial profile from the API
+ * @returns {{ balances: number[], events: Array, insight: string }}
+ */
+function getAIForecast(userData) {
+  // TODO: Replace with real AI API call:
+  // const res = await fetch('/api/ai/forecast', {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAuthToken()}` },
+  //   body: JSON.stringify({ userData }),
+  // });
+  // return res.json();
+
+  // --- MOCK: derive forecast from user data ---
+  const balance = userData.balance ?? 0;
+
+  // Estimate average daily spend from recent expense transactions
+  const recentExpenses = (userData.transactions || []).filter(t => t.type === 'expense').slice(0, 14);
+  const dailySpend = recentExpenses.length
+    ? Math.round((recentExpenses.reduce((s, t) => s + t.amount, 0) / Math.max(recentExpenses.length, 1)) * 10) / 10
+    : 3;
+
+  const now = new Date();
+  const balances = [];
+  let bal = balance;
+
+  for (let i = 0; i < 7; i++) {
+    // Apply incoming payments due on this offset day
+    (userData.payments || [])
+      .filter(p => p.type === 'incoming' && p.status === 'pending' && p.dueDate)
+      .forEach(p => {
+        const offset = Math.round((new Date(p.dueDate) - now) / 86400000);
+        if (offset === i) bal += p.amount;
+      });
+    // Apply outgoing payments due on this offset day
+    (userData.payments || [])
+      .filter(p => p.type === 'outgoing' && p.status === 'pending' && p.dueDate)
+      .forEach(p => {
+        const offset = Math.round((new Date(p.dueDate) - now) / 86400000);
+        if (offset === i) bal -= p.amount;
+      });
+    bal -= dailySpend;
+    balances.push(Math.round(bal * 100) / 100);
+  }
+  // Prepend starting balance as day-0, keep 7 total points
+  balances.unshift(balance);
+  balances.length = 7;
+
+  // Build event markers for the chart
+  const events = [];
+  if (balance < 10) {
+    events.push({ day: 0, label: 'Χαμηλό υπόλοιπο σήμερα', type: 'warn' });
+  }
+  (userData.payments || [])
+    .filter(p => p.type === 'incoming' && p.status === 'pending' && p.dueDate)
+    .forEach(p => {
+      const offset = Math.round((new Date(p.dueDate) - now) / 86400000);
+      if (offset >= 0 && offset < 7) {
+        events.push({ day: offset, label: `Πληρωμή +${p.amount}€ (${p.name})`, type: 'income' });
+      }
+    });
+
+  // One-line insight
+  const hasIncoming = events.some(e => e.type === 'income');
+  let insight;
+  if (balance < 10 && hasIncoming) {
+    insight = 'Είσαι χαμηλά σήμερα, αλλά θα ανακάμψεις μετά την επερχόμενη πληρωμή σου.';
+  } else if (balance < 10) {
+    insight = 'Προσοχή — το υπόλοιπό σου είναι χαμηλό. Απόφυγε μη απαραίτητες αγορές.';
+  } else {
+    insight = 'Το υπόλοιπό σου φαίνεται σταθερό για τις επόμενες 7 ημέρες.';
+  }
+
+  return { balances, events, insight };
+}
+
+/**
+ * Returns 2–3 personalised coaching tips based on the user's financial data.
+ *
+ * PROMPT TO SEND TO AI:
+ * ──────────────────────────────────────────────────────────────
+ * You are a personal finance coach for students.
+ * Given the user's data, generate 2 to 3 short, actionable tips.
+ *
+ * User data (JSON): {{ userData }}
+ *
+ * Return ONLY valid JSON array (no markdown):
+ * [
+ *   {
+ *     "icon": "⚠️" | "💡" | "🎯" | "📉" | "💰",
+ *     "accent": "orange" | "blue" | "green" | "red",
+ *     "title": "<max 4 words, in Greek>",
+ *     "body": "<1 sentence, max 65 chars, in Greek, mention specific amounts or categories>",
+ *     "action": {
+ *       "label": "<1–3 words in Greek>",
+ *       "type": "view_spending" | "view_debts" | "view_savings" | "set_limit"
+ *     }
+ *   }
+ * ]
+ *
+ * Rules:
+ * - Max 3 tips. Min 1 tip.
+ * - First tip = most urgent (low balance > debt > spending pattern > savings)
+ * - Always reference real numbers or categories from the user data
+ * - All text must be in Greek
+ * - Do NOT give generic advice — tie every tip to something specific in the data
+ * ──────────────────────────────────────────────────────────────
+ *
+ * @param {object} userData - Full user financial profile from the API
+ * @returns {Array<{ icon, accent, title, body, action: { label, type } }>}
+ */
+function getAITips(userData) {
+  // TODO: Replace with real AI API call:
+  // const res = await fetch('/api/ai/tips', {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAuthToken()}` },
+  //   body: JSON.stringify({ userData }),
+  // });
+  // return res.json();
+
+  // --- MOCK: derive tips from user data ---
+  const balance = userData.balance ?? 0;
+  const debts = (userData.debts || []).filter(d => d.type === 'owe');
+  const transactions = userData.transactions || [];
+  const incoming = (userData.payments || []).filter(p => p.type === 'incoming' && p.status === 'pending');
+
+  const tips = [];
+
+  // Tip 1 — Low balance warning
+  if (balance < 10) {
+    tips.push({
+      icon: '⚠️',
+      accent: 'orange',
+      title: 'Χαμηλό υπόλοιπο',
+      body: `Έχεις μόνο ${balance.toFixed(2)}€ — απόφυγε αγορές σήμερα.`,
+      action: { label: 'Ορισμός ορίου', type: 'set_limit' },
+    });
+  }
+
+  // Tip 2 — Frequent small spending pattern
+  const smallSpends = transactions.filter(t => t.type === 'expense' && t.amount <= 5);
+  if (smallSpends.length >= 2) {
+    const cats = [...new Set(smallSpends.map(t => t.category))].slice(0, 2);
+    const catNames = cats.map(c => getCategoryInfo(c).name.toLowerCase()).join(' & ');
+    tips.push({
+      icon: '💡',
+      accent: 'blue',
+      title: 'Μικρές συχνές δαπάνες',
+      body: `Ξοδεύεις συχνά σε μικρά ποσά (${catNames}). Πρόσεχε τις συνήθειες σου.`,
+      action: { label: 'Δες συναλλαγές', type: 'view_spending' },
+    });
+  }
+
+  // Tip 3 — Debt repayment opportunity
+  const totalDebt = debts.reduce((s, d) => s + d.amount, 0);
+  const totalIncoming = incoming.reduce((s, p) => s + p.amount, 0);
+  if (totalDebt > 0 && (balance + totalIncoming) >= totalDebt) {
+    const debtPerson = debts[0]?.name ?? '';
+    tips.push({
+      icon: '🎯',
+      accent: 'green',
+      title: 'Αποπλήρωσε το χρέος',
+      body: `Μπορείς να αποπληρώσεις τα ${totalDebt}€ που χρωστάς${debtPerson ? ` στον ${debtPerson}` : ''} μετά την πληρωμή.`,
+      action: { label: 'Δες χρέη', type: 'view_debts' },
+    });
+  }
+
+  // Fallback tip
+  if (tips.length === 0) {
+    tips.push({
+      icon: '💰',
+      accent: 'green',
+      title: 'Καλή πορεία!',
+      body: 'Συνέχισε έτσι — το υπόλοιπό σου είναι σε καλό επίπεδο.',
+      action: { label: 'Δες αποταμίευση', type: 'view_savings' },
+    });
+  }
+
+  return tips;
+}
+
+// ---- RENDER FUNCTION ----
+
+async function renderAIInsights() {
+  // Build user data object from current state for the AI functions
+  const userData = {
+    balance:      state.balance,
+    savings:      state.savings,
+    transactions: state.transactions,
+    goals:        state.savingsGoals,
+    debts:        state.debts,
+    payments:     state.payments,
+  };
+
+  // Fetch AI tips from backend
+  let forecastData = null;
+  let tipsData = null;
+  try {
+    const aiTips = await apiPost('/aiTips');
+    if (Array.isArray(aiTips)) {
+      const forecasts = aiTips.filter(t => t.type === 'forecast');
+      const tips      = aiTips.filter(t => t.type === 'tips');
+      if (forecasts.length) forecastData = forecasts[forecasts.length - 1];
+      if (tips.length)      tipsData     = tips[tips.length - 1];
+    }
+  } catch (_) { /* fall back to mock data */ }
+
+  // --- Forecast ---
+  const { balances, events, insight } = forecastData ?? getAIForecast(userData);
+
+  // Normalize + dedupe events so the UI does not render duplicate pills/markers.
+  const uniqueEvents = (Array.isArray(events) ? events : []).reduce((acc, ev) => {
+    const day = Number(ev?.day);
+    const label = String(ev?.label || '').trim();
+    const type = String(ev?.type || 'warn').trim();
+
+    if (!Number.isInteger(day) || day < 0 || day >= balances.length || !label) return acc;
+
+    const key = `${day}|${type.toLowerCase()}|${label.toLowerCase()}`;
+    if (acc.seen.has(key)) return acc;
+
+    acc.seen.add(key);
+    acc.items.push({ day, type, label });
+    return acc;
+  }, { seen: new Set(), items: [] }).items;
+
+  // Pills should show unique messages only, even if repeated across multiple days.
+  const uniquePillEvents = uniqueEvents.reduce((acc, ev) => {
+    const key = `${String(ev.type || '').toLowerCase()}|${String(ev.label || '').toLowerCase()}`;
+    if (acc.seen.has(key)) return acc;
+    acc.seen.add(key);
+    acc.items.push(ev);
+    return acc;
+  }, { seen: new Set(), items: [] }).items;
+
+  // Render SVG chart
+  const chartEl = document.getElementById('ai-forecast-chart');
+  if (chartEl) {
+    const W = 300, H = 72, pX = 6, pY = 8;
+    const min = Math.min(...balances);
+    const max = Math.max(...balances);
+    const range = max - min || 1;
+    const n = balances.length;
+
+    const pts = balances.map((v, i) => [
+      pX + (i / (n - 1)) * (W - pX * 2),
+      pY + (1 - (v - min) / range) * (H - pY * 2),
+    ]);
+
+    const polyLine = pts.map(p => p.join(',')).join(' ');
+    const areaPath  = `${pts[0][0]},${H} ${polyLine} ${pts[n - 1][0]},${H}`;
+
+    const today = new Date();
+    const dayLabels = balances.map((_, i) => {
+      if (i === 0) return 'Σήμερα';
+      const d = new Date(today);
+      d.setDate(d.getDate() + i);
+      return d.toLocaleDateString('el-GR', { weekday: 'narrow' });
+    });
+
+    const dots = pts.map(([x, y], i) => {
+      const ev = uniqueEvents.find(e => e.day === i);
+      if (!ev) return '';
+      const fill = ev.type === 'income' ? '#30D158' : '#FF9500';
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${fill}" stroke="#1B1B1D" stroke-width="2"/>`;
+    }).join('');
+
+    const labels = pts.map(([x], i) =>
+      `<text x="${x.toFixed(1)}" y="${H + 14}" font-size="8.5" fill="#7B7B85" text-anchor="middle" font-family="Inter,sans-serif">${dayLabels[i]}</text>`
+    ).join('');
+
+    const valueTips = pts.map(([x, y], i) => {
+      const ev = uniqueEvents.find(e => e.day === i);
+      if (!ev) return '';
+      const col = ev.type === 'income' ? '#30D158' : '#FF9500';
+      return `<text x="${x.toFixed(1)}" y="${(y - 8).toFixed(1)}" font-size="8" fill="${col}" text-anchor="middle" font-weight="600" font-family="Inter,sans-serif">${balances[i]}€</text>`;
+    }).join('');
+
+    chartEl.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H + 20}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible;padding:20px;">
+        <defs>
+          <linearGradient id="fcGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#007AFF" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="#007AFF" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <polygon points="${areaPath}" fill="url(#fcGrad)"/>
+        <polyline points="${polyLine}" fill="none" stroke="#007AFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        ${valueTips}
+        ${dots}
+        ${labels}
+      </svg>`;
+  }
+
+  // Render event pills
+  const eventsEl = document.getElementById('ai-forecast-events');
+  if (eventsEl) {
+    eventsEl.innerHTML = uniquePillEvents.map(ev => `
+      <div class="ai-event-pill ${ev.type}">
+        <span class="ai-event-dot"></span>
+        <span>${ev.label}</span>
+      </div>`).join('');
+  }
+
+  // Render footer (final balance + insight)
+  const footerEl = document.getElementById('ai-forecast-footer');
+  if (footerEl) {
+    const finalBal = balances[balances.length - 1];
+    footerEl.innerHTML = `
+      <div class="ai-forecast-final-row">
+        <span class="ai-forecast-final-label">Σε 7 ημέρες</span>
+        <span class="ai-forecast-final-value">${finalBal.toFixed(2)}€</span>
+      </div>
+      <div class="ai-forecast-insight">${insight}</div>`;
+  }
+
+  // --- Smart tips ---
+  const tipsEl = document.getElementById('ai-tips-list');
+  if (!tipsEl) return;
+
+  const tips = tipsData?.tips ?? getAITips(userData);
+
+  const tipHTML = tips.map((t, i) => `
+    <div class="ai-tip-card ai-tip-${t.accent}${i > 0 ? ' ai-tip-hidden' : ''}">
+      <div class="ai-tip-top">
+        <span class="ai-tip-icon">${t.icon}</span>
+        <span class="ai-tip-title">${t.title}</span>
+      </div>
+      <p class="ai-tip-body">${t.body}</p>
+      <button class="ai-tip-action" onclick="handleTipAction('${t.action.type}')">${t.action.label}</button>
+    </div>`).join('');
+
+  const moreBtnHTML = tips.length > 1
+    ? `<button class="ai-tips-more-btn" id="ai-tips-more-btn" onclick="showMoreTips()">
+        Δείτε περισσότερα
+        <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M6 9l6 6 6-6"/></svg>
+       </button>`
+    : '';
+
+  tipsEl.innerHTML = tipHTML + moreBtnHTML;
+}
+
 // ---- HOME VIEW ----
 function renderHome() {
   updateTime();
@@ -511,6 +919,7 @@ function renderHome() {
   renderWeekCalendar();
   renderPeopleRow();
   renderBalanceCard();
+  renderAIInsights();
   renderFlowCard();
   renderQuickActions();
   renderStats();
@@ -2122,6 +2531,9 @@ async function init(bypassLoginCheck = false) {
 
   await loadData();
 
+  // Always start on today's local date to avoid timezone-shifted persisted values.
+  state.selectedDate = startOfDay(new Date());
+
   // Navigation
   document.querySelectorAll('.tab-item').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -2330,7 +2742,7 @@ function setupAnimateIn(container) {
 }
 
 // Start
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', init(true));
 
 
 document.getElementById("transaction-title").addEventListener("focus", function () {

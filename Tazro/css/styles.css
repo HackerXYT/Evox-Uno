@@ -121,6 +121,7 @@ button {
 button {
   cursor: pointer;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 a {
@@ -3839,4 +3840,292 @@ img {
 
 .tab-item.active.largetxt {
   border-radius: 16px;
+}
+
+/* ============================================
+   AI INSIGHTS — Forecasting + Smart Tips
+   ============================================ */
+
+/* --- Forecasting Card --- */
+.ai-forecast-card {
+  margin: 0 var(--space-lg) var(--space-base);
+  padding: var(--space-lg) var(--space-xl) var(--space-base);
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  transition: transform var(--duration-fast) var(--ease-smooth);
+}
+
+.ai-forecast-card:active {
+  transform: scale(0.985);
+}
+
+/* --- Clickable header row --- */
+.ai-forecast-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Collapsed: no bottom margin on header (body is hidden) */
+.ai-forecast-card:not(.collapsed) .ai-forecast-header {
+  margin-bottom: var(--space-base);
+}
+
+.ai-forecast-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-forecast-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--text-primary);
+}
+
+.ai-forecast-sub {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+/* --- Chevron --- */
+.ai-forecast-chevron {
+  color: var(--text-tertiary);
+  transition: transform var(--duration-normal) var(--ease-out);
+  flex-shrink: 0;
+  transform: rotate(90deg);
+}
+
+.ai-forecast-card.collapsed .ai-forecast-chevron {
+  transform: rotate(0deg);
+}
+
+/* --- AI badge --- */
+.ai-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--blue);
+  background: var(--blue-bg);
+  border: 1px solid rgba(0, 122, 255, 0.25);
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+}
+
+/* --- Collapsible body --- */
+.ai-forecast-body {
+  overflow: hidden;
+  max-height: 600px;
+  opacity: 1;
+  transition: max-height 0.42s var(--ease-out),
+              opacity 0.3s var(--ease-smooth);
+}
+
+.ai-forecast-card.collapsed .ai-forecast-body {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* --- Chart --- */
+.ai-forecast-chart {
+  margin: 0 -4px var(--space-md);
+  overflow: visible;
+}
+
+/* --- Event pills --- */
+.ai-forecast-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: var(--space-md);
+}
+
+.ai-event-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+.ai-event-pill.warn   { background: var(--orange-bg); color: var(--orange); }
+.ai-event-pill.income { background: var(--green-bg);  color: var(--green);  }
+.ai-event-pill.expense { background: var(--red-bg);  color: var(--red);  }
+
+.ai-event-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* --- Footer --- */
+.ai-forecast-final-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.ai-forecast-final-label {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.ai-forecast-final-value {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--green);
+}
+
+.ai-forecast-insight {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+/* ============================================
+   Smart Tips Section
+   ============================================ */
+
+.ai-tips-section {
+  margin: 0 var(--space-lg) var(--space-base);
+}
+
+.ai-tips-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.ai-tips-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.ai-tips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* --- Individual tip card --- */
+.ai-tip-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-base) var(--space-base) var(--space-md);
+  border-left: 3px solid transparent;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-fast) var(--ease-smooth),
+              box-shadow var(--duration-fast) var(--ease-smooth);
+  animation: tipSlideIn var(--duration-slow) var(--ease-out) both;
+}
+
+.ai-tip-card:active {
+  transform: scale(0.984);
+  box-shadow: none;
+}
+
+/* Hidden extra tips */
+.ai-tip-hidden {
+  display: none;
+}
+
+.ai-tip-orange { border-left-color: var(--orange); }
+.ai-tip-blue   { border-left-color: var(--blue); }
+.ai-tip-green  { border-left-color: var(--green); }
+
+.ai-tip-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.ai-tip-icon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.ai-tip-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.1px;
+}
+
+.ai-tip-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-bottom: var(--space-sm);
+  padding-left: 24px;
+}
+
+.ai-tip-action {
+  margin-left: 24px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  background: var(--blue-bg);
+  border-radius: var(--radius-full);
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--ease-smooth);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ai-tip-orange .ai-tip-action { color: var(--orange); background: var(--orange-bg); }
+.ai-tip-green  .ai-tip-action { color: var(--green);  background: var(--green-bg); }
+
+.ai-tip-action:active { opacity: 0.65; }
+
+/* --- "Δείτε περισσότερα" button --- */
+.ai-tips-more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-smooth),
+              opacity var(--duration-fast) var(--ease-smooth);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ai-tips-more-btn:active {
+  background: var(--surface-hover);
+  opacity: 0.8;
+}
+
+.ai-tips-more-btn svg {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+@keyframes tipSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
