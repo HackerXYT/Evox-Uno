@@ -3669,14 +3669,30 @@ img {
 
 .future-payment-date-input {
   width: 100%;
-  padding: 10px var(--space-sm);
+  padding: 12px var(--space-sm);
   background: transparent;
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 16px;
+  font-family: var(--font);
   border-radius: var(--radius-sm);
   border: none;
   outline: none;
   color-scheme: dark;
+  line-height: 1.4;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.future-payment-date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.future-payment-date-input::-webkit-outer-spin-button,
+.future-payment-date-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* ===== UPCOMING PAYMENTS (in Transactions view) ===== */
