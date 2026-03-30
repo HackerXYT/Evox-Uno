@@ -26,11 +26,16 @@ const defaultState = {
   faIconQuery: '',
   faIconsLoading: false,
   editingDebtId: null,
+  isFuturePayment: false,
+  futurePaymentDueDate: '',
+  paymentViewTab: 'incoming',
+  editingPaymentId: null,
   transactionFilter: 'all',
   searchQuery: '',
   transactions: [],
   savingsGoals: [],
   debts: [],
+  payments: [],
 };
 
 let persistedState = null;
@@ -55,7 +60,7 @@ const SAVINGS_HISTORY_KEY = 'tazroSavingsHistory';
 
 function recordSavingsSnapshot() {
   let history = [];
-  try { history = JSON.parse(localStorage.getItem(SAVINGS_HISTORY_KEY)) || []; } catch {}
+  try { history = JSON.parse(localStorage.getItem(SAVINGS_HISTORY_KEY)) || []; } catch { }
   history.push({ date: new Date().toISOString(), savings: state.savings });
   if (history.length > 90) history = history.slice(-90);
   localStorage.setItem(SAVINGS_HISTORY_KEY, JSON.stringify(history));
@@ -114,6 +119,7 @@ async function loadData() {
   state.transactions = data.transactions ?? [];
   state.savingsGoals = data.goals ?? [];
   state.debts = data.debts ?? [];
+  state.payments = data.payments ?? [];
 
   // Seed savings history on first run so the chart always has a starting point
   if (getSavingsHistory().length === 0) recordSavingsSnapshot();
@@ -341,8 +347,8 @@ function updateGoalIconPreview() {
 
   if (iconSlot) iconSlot.innerHTML = renderFaIcon(safeClass, 'fa-solid fa-bullseye');
   if (textSlot) textSlot.textContent = safeClass.replace('fa-', '').replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase()).split(' ')
-  .slice(2)
-  .join(' ');
+    .slice(2)
+    .join(' ');
 }
 
 function renderFaIconGrid() {
@@ -720,11 +726,31 @@ function renderRecentTransactions() {
     titleEl.textContent = isTodaySelected ? 'Πρόσφατα' : `Συναλλαγές ${selectedLabel}`;
   }
 
-  const sourceTransactions = isTodaySelected
+  const sourceTx = isTodaySelected
     ? state.transactions
     : state.transactions.filter(t => sameDay(new Date(t.date), selectedDate));
 
-  if (sourceTransactions.length === 0) {
+  // Pending payments: on "today" view show all pending; on a specific date show payments due that day
+  const sourcePay = isTodaySelected
+    ? state.payments.filter(p => p.status === 'pending')
+    : state.payments.filter(p => p.status === 'pending' && p.dueDate && sameDay(new Date(p.dueDate), selectedDate));
+
+  // Tag items so we know which renderer to use, then sort together
+  const tagged = [
+    ...sourceTx.map(t => ({ _item: t, _kind: 'tx', _date: new Date(t.date) })),
+    ...sourcePay.map(p => ({ _item: p, _kind: 'pay', _date: p.dueDate ? new Date(p.dueDate) : new Date() })),
+  ];
+
+  // Overdue payments first, then sort everything by effective date descending
+  const now = new Date();
+  tagged.sort((a, b) => {
+    const aOverdue = a._kind === 'pay' && a._date < now;
+    const bOverdue = b._kind === 'pay' && b._date < now;
+    if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+    return b._date - a._date;
+  });
+
+  if (tagged.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">${renderFaIcon('fa-solid fa-receipt', 'fa-solid fa-receipt')}</div>
@@ -733,8 +759,10 @@ function renderRecentTransactions() {
     return;
   }
 
-  const recent = sourceTransactions.slice(0, 4);
-  container.innerHTML = recent.map(t => transactionItemHTML(t)).join('');
+  const slice = tagged.slice(0, 5);
+  container.innerHTML = slice.map(({ _item, _kind }) =>
+    _kind === 'pay' ? futurePaymentItemHTML(_item) : transactionItemHTML(_item)
+  ).join('');
 }
 
 function transactionItemHTML(t) {
@@ -806,13 +834,139 @@ function transactionItemHTML(t) {
 }
 
 function toggleTransactionDetail(id) {
-  document.querySelectorAll('.transaction-item').forEach(el => {
+  document.querySelectorAll('.transaction-item[data-id]').forEach(el => {
     if (parseInt(el.dataset.id) === id) {
       el.classList.toggle('expanded');
     } else {
       el.classList.remove('expanded');
     }
   });
+}
+
+// ---- FUTURE PAYMENT ITEMS ----
+function futurePaymentItemHTML(p) {
+  const isIncoming = p.type === 'incoming';
+  const cat = getCategoryInfo(p.category);
+  const sign = isIncoming ? '+' : '-';
+  const cls = isIncoming ? 'income' : 'expense';
+  const now = new Date();
+  const overdue = p.dueDate && new Date(p.dueDate) < now;
+  const dueDateLabel = p.dueDate
+    ? new Date(p.dueDate).toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' })
+    : 'Χωρίς λήξη';
+
+  return `
+    <div class="transaction-item fp-item fp-${isIncoming ? 'incoming' : 'outgoing'}${overdue ? ' fp-overdue' : ''}"
+         data-pid="${p.id}" onclick="toggleFuturePaymentDetail(${p.id})">
+
+      <!-- ── Main row ── -->
+      <div class="transaction-main">
+        <div class="transaction-icon fp-icon-wrap" style="background:${cat.bg}">
+          ${renderFaIcon(cat.icon, 'fa-solid fa-tag')}
+          <div class="fp-clock-badge">
+            <i class="fa-solid fa-clock" aria-hidden="true"></i>
+          </div>
+        </div>
+        <div class="transaction-info">
+          <div class="name">${p.name}</div>
+          <div class="category fp-due ${overdue ? 'fp-overdue-label' : ''}">
+            ${overdue ? '<i class="fa-solid fa-circle-exclamation fp-warn-icon"></i>' : ''}
+            Λήξη: ${dueDateLabel}
+          </div>
+        </div>
+        <div class="transaction-amount">
+          <div class="amount ${cls} fp-amount-dim">${sign}${formatCurrency(p.amount)}€</div>
+          <div class="fp-pending-pill ${isIncoming ? 'fp-pill-in' : 'fp-pill-out'}">
+            ${isIncoming ? 'Εισερχόμενο' : 'Εξερχόμενο'}
+          </div>
+        </div>
+        <div class="transaction-chevron">
+          <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+
+      <!-- ── Inline detail panel ── -->
+      <div class="transaction-detail-panel">
+        <div class="panel-inner">
+          <div class="panel-body">
+            <div class="detail-field">
+              <span class="detail-key">Ποσό</span>
+              <span class="detail-val ${cls}">${sign}${formatCurrency(p.amount)}€</span>
+            </div>
+            <div class="detail-field">
+              <span class="detail-key">Ημερομηνία Λήξης</span>
+              <span class="detail-val ${overdue ? 'fp-overdue-label' : ''}">${dueDateLabel}${overdue ? ' · Εκπρόθεσμο' : ''}</span>
+            </div>
+            <div class="detail-field">
+              <span class="detail-key">Κατηγορία</span>
+              <span class="detail-val">${renderFaIcon(cat.icon, 'fa-solid fa-tag', 'category-inline-icon')} ${cat.name}</span>
+            </div>
+            <div class="detail-field">
+              <span class="detail-key">Τύπος</span>
+              <span class="detail-val">${isIncoming ? 'Εισερχόμενο' : 'Εξερχόμενο'}</span>
+            </div>
+            ${p.note ? `<div class="detail-field">
+              <span class="detail-key">Σημείωση</span>
+              <span class="detail-val">${p.note}</span>
+            </div>` : ''}
+            <div class="panel-actions">
+              <button class="panel-settle-btn"
+                onclick="event.stopPropagation(); settlePaymentInline(${p.id})">
+                <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Εξόφληση
+              </button>
+              <button class="panel-delete-btn"
+                onclick="event.stopPropagation(); deletePaymentInline(${p.id})">
+                <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                  <path d="M10 11v6M14 11v6"/>
+                  <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+                </svg>
+                Διαγραφή
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>`;
+}
+
+function toggleFuturePaymentDetail(id) {
+  document.querySelectorAll('.fp-item[data-pid]').forEach(el => {
+    if (parseInt(el.dataset.pid) === id) {
+      el.classList.toggle('expanded');
+    } else {
+      el.classList.remove('expanded');
+    }
+  });
+}
+
+async function settlePaymentInline(id) {
+  const payment = state.payments.find(p => p.id === id);
+  if (!payment) return;
+  const data = await apiPost(`/payments/${id}/settle`, {}).catch(() => null);
+  if (!data) return;
+  const idx = state.payments.findIndex(p => p.id === id);
+  if (idx !== -1) state.payments[idx] = data.payment;
+  state.transactions.unshift(data.transaction);
+  state.balance = data.balance;
+  const icon = payment.type === 'incoming' ? 'fa-solid fa-circle-arrow-down' : 'fa-solid fa-circle-arrow-up';
+  showToast(icon, `Εξοφλήθηκε: ${payment.name} — ${payment.type === 'incoming' ? '+' : '-'}${formatCurrency(payment.amount)}€`);
+  renderView(state.currentView);
+  renderBalanceCard();
+}
+
+async function deletePaymentInline(id) {
+  const payment = state.payments.find(p => p.id === id);
+  if (!payment) return;
+  await apiDelete(`/payments/${id}`).catch(() => null);
+  state.payments = state.payments.filter(p => p.id !== id);
+  showToast('fa-solid fa-trash', `Διαγράφηκε: ${payment.name}`);
+  renderView(state.currentView);
 }
 
 // ---- TRANSACTIONS VIEW ----
@@ -852,31 +1006,44 @@ function renderTransactionList() {
   const container = document.getElementById('transaction-list');
   if (!container) return;
 
-  let filtered = [...state.transactions];
+  const q = state.searchQuery ? state.searchQuery.toLowerCase() : '';
+  const f = state.transactionFilter;
 
-  if (state.searchQuery) {
-    const q = state.searchQuery.toLowerCase();
-    filtered = filtered.filter(t => t.name.toLowerCase().includes(q) || t.note.toLowerCase().includes(q));
-  }
-
-  if (state.transactionFilter === 'income') {
-    filtered = filtered.filter(t => t.type === 'income');
-  } else if (state.transactionFilter === 'expense') {
-    filtered = filtered.filter(t => t.type === 'expense');
-  } else if (state.transactionFilter !== 'all') {
-    filtered = filtered.filter(t => t.category === state.transactionFilter);
-  }
-
-  // Group by date
-  const groups = {};
-  filtered.forEach(t => {
-    const key = formatDate(t.date);
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(t);
+  // ── Filter transactions ──
+  let filteredTx = state.transactions.filter(t => {
+    if (q && !t.name.toLowerCase().includes(q) && !(t.note || '').toLowerCase().includes(q)) return false;
+    if (f === 'income') return t.type === 'income';
+    if (f === 'expense') return t.type === 'expense';
+    if (f !== 'all') return t.category === f;
+    return true;
   });
 
-  if (Object.keys(groups).length === 0) {
-    const isEmpty = state.transactions.length === 0;
+  // ── Filter pending payments ──
+  let filteredPay = state.payments.filter(p => p.status === 'pending').filter(p => {
+    if (q && !p.name.toLowerCase().includes(q) && !(p.note || '').toLowerCase().includes(q)) return false;
+    if (f === 'income') return p.type === 'incoming';
+    if (f === 'expense') return p.type === 'outgoing';
+    if (f !== 'all') return p.category === f;
+    return true;
+  });
+
+  // ── Tag & merge ──
+  const now = new Date();
+  const tagged = [
+    ...filteredTx.map(t => ({ _item: t, _kind: 'tx', _date: new Date(t.date) })),
+    ...filteredPay.map(p => ({ _item: p, _kind: 'pay', _date: p.dueDate ? new Date(p.dueDate) : now })),
+  ];
+
+  // Sort: overdue payments first, then by date descending
+  tagged.sort((a, b) => {
+    const aOverdue = a._kind === 'pay' && a._date < now;
+    const bOverdue = b._kind === 'pay' && b._date < now;
+    if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+    return b._date - a._date;
+  });
+
+  if (tagged.length === 0) {
+    const isEmpty = state.transactions.length === 0 && state.payments.filter(p => p.status === 'pending').length === 0;
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">${renderFaIcon(isEmpty ? 'fa-solid fa-receipt' : 'fa-solid fa-magnifying-glass', 'fa-solid fa-receipt')}</div>
@@ -885,12 +1052,29 @@ function renderTransactionList() {
     return;
   }
 
+  // ── Group by date label ──
+  const groups = {};
+  tagged.forEach(({ _item, _kind, _date }) => {
+    // Pending future payments get a "Προγραμματισμένο" prefix so they group together
+    let key;
+    if (_kind === 'pay') {
+      const overdue = _date < now;
+      key = overdue ? `⚠ Εκπρόθεσμο · ${formatDate(_item.dueDate || _item.date)}` : `📅 ${formatDate(_item.dueDate || _item.date)}`;
+    } else {
+      key = formatDate(_item.date);
+    }
+    if (!groups[key]) groups[key] = [];
+    groups[key].push({ _item, _kind });
+  });
+
   let html = '';
-  Object.entries(groups).forEach(([date, txs]) => {
+  Object.entries(groups).forEach(([dateLabel, items]) => {
     html += `<div class="date-group">
-      <div class="date-group-header">${date}</div>
+      <div class="date-group-header">${dateLabel}</div>
       <div class="transaction-list-inner">
-        ${txs.map(t => transactionItemHTML(t)).join('')}
+        ${items.map(({ _item, _kind }) =>
+      _kind === 'pay' ? futurePaymentItemHTML(_item) : transactionItemHTML(_item)
+    ).join('')}
       </div>
     </div>`;
   });
@@ -1077,9 +1261,9 @@ function renderSavingsChart() {
     ctx.closePath();
 
     const grad = ctx.createLinearGradient(x0, 0, x1, 0);
-    grad.addColorStop(0,   `rgba(${r},${g},${b},0.30)`);
+    grad.addColorStop(0, `rgba(${r},${g},${b},0.30)`);
     grad.addColorStop(0.5, `rgba(${r},${g},${b},0.58)`);
-    grad.addColorStop(1,   `rgba(${r},${g},${b},0.30)`);
+    grad.addColorStop(1, `rgba(${r},${g},${b},0.30)`);
     ctx.fillStyle = grad;
     ctx.fill();
 
@@ -1177,6 +1361,161 @@ function renderGoals() {
   container.innerHTML = html;
 }
 
+// ---- UPCOMING PAYMENTS (embedded in Transactions view) ----
+function renderUpcomingPayments() {
+  const section = document.getElementById('upcoming-payments-section');
+  if (!section) return;
+
+  const pending = state.payments.filter(p => p.status === 'pending');
+  if (pending.length === 0) {
+    section.innerHTML = '';
+    return;
+  }
+
+  // Sort: overdue first, then by due date ascending
+  const sorted = [...pending].sort((a, b) => {
+    const da = a.dueDate ? new Date(a.dueDate) : new Date(8640000000000000);
+    const db = b.dueDate ? new Date(b.dueDate) : new Date(8640000000000000);
+    return da - db;
+  });
+
+  const incomingTotal = sorted.filter(p => p.type === 'incoming').reduce((s, p) => s + p.amount, 0);
+  const outgoingTotal = sorted.filter(p => p.type === 'outgoing').reduce((s, p) => s + p.amount, 0);
+
+  section.innerHTML = `
+    <div class="upcoming-payments-header" onclick="toggleUpcomingSection()">
+      <div class="upcoming-payments-title">
+        ${renderFaIcon('fa-solid fa-calendar-days', 'fa-solid fa-calendar-days')}
+        <span>Προγραμματισμένες Πληρωμές</span>
+        <span class="upcoming-count">${sorted.length}</span>
+      </div>
+      <div class="upcoming-payments-summary">
+        ${incomingTotal > 0 ? `<span class="upcoming-sum incoming">+${formatCurrency(incomingTotal)}€</span>` : ''}
+        ${outgoingTotal > 0 ? `<span class="upcoming-sum outgoing">-${formatCurrency(outgoingTotal)}€</span>` : ''}
+        <svg class="upcoming-chevron" id="upcoming-chevron" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+    <div class="upcoming-payments-list" id="upcoming-payments-list">
+      ${sorted.map(p => paymentCardHTML(p)).join('')}
+    </div>`;
+}
+
+function toggleUpcomingSection() {
+  const list = document.getElementById('upcoming-payments-list');
+  const chevron = document.getElementById('upcoming-chevron');
+  if (!list) return;
+  const isOpen = list.classList.toggle('open');
+  if (chevron) chevron.style.transform = isOpen ? 'rotate(180deg)' : '';
+}
+
+function paymentCardHTML(p) {
+  const isIncoming = p.type === 'incoming';
+  const isSettled = p.status === 'settled';
+  const dueDateLabel = p.dueDate ? new Date(p.dueDate).toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  const overdue = !isSettled && p.dueDate && new Date(p.dueDate) < new Date();
+
+  return `
+    <div class="payment-card ${isSettled ? 'settled' : ''} ${overdue ? 'overdue' : ''}" data-id="${p.id}">
+      <div class="payment-card-icon">
+        <div class="payment-direction-badge ${isIncoming ? 'incoming' : 'outgoing'}">
+          <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            ${isIncoming
+      ? '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>'
+      : '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>'}
+          </svg>
+        </div>
+      </div>
+      <div class="payment-card-info">
+        <div class="name">${p.name}</div>
+        <div class="payment-due ${overdue ? 'overdue-label' : ''}">
+          ${overdue ? '<i class="fa-solid fa-circle-exclamation" style="font-size:11px;margin-right:3px"></i>' : ''}
+          Λήξη: ${dueDateLabel}
+        </div>
+        ${p.note ? `<div class="payment-note">${p.note}</div>` : ''}
+      </div>
+      <div class="debt-card-right">
+        <div class="debt-card-amount">
+          <div class="amount ${isIncoming ? 'lent' : 'owe'}">${isIncoming ? '+' : '-'}${formatCurrency(p.amount)}€</div>
+          <div class="date">${isSettled ? 'Εξοφλήθηκε' : 'Εκκρεμεί'}</div>
+        </div>
+        <div class="debt-card-actions">
+          ${!isSettled ? `
+          <button class="debt-action settle payment-settle-btn" onclick="settlePayment(${p.id}, event)" title="Εξόφληση">
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>` : ''}
+          <button class="debt-action edit" onclick="editPayment(${p.id}, event)" title="Επεξεργασία">
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="debt-action delete" onclick="deletePayment(${p.id}, event)" title="Διαγραφή">
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ---- PAYMENT ACTIONS ----
+function editPayment(id, event) {
+  event.stopPropagation();
+  const payment = state.payments.find(p => p.id === id);
+  if (!payment) return;
+
+  // Reuse the add-sheet in future-payment edit mode
+  state.editingPaymentId = id;
+  state.addType = payment.type === 'incoming' ? 'income' : 'expense';
+  state.amountStr = String(payment.amount);
+  state.selectedCategory = payment.category || null;
+  state.isFuturePayment = true;
+  state.futurePaymentDueDate = payment.dueDate ? payment.dueDate.slice(0, 10) : '';
+
+  const overlay = document.getElementById('add-sheet-overlay');
+  overlay.classList.add('visible');
+  state.addSheetOpen = true;
+
+  const titleEl = document.getElementById('transaction-title');
+  if (titleEl) { titleEl.value = payment.name; }
+  const counter = document.getElementById('tx-title-counter');
+  if (counter) counter.textContent = `${payment.name.length} / 40`;
+
+  const dateInput = document.getElementById('future-payment-date');
+  if (dateInput) dateInput.value = state.futurePaymentDueDate;
+
+  const headerEl = document.querySelector('#add-sheet-overlay .sheet-header h2');
+  if (headerEl) headerEl.textContent = 'Επεξεργασία Πληρωμής';
+
+  renderAddSheet();
+  updateSaveButton();
+}
+
+async function deletePayment(id, event) {
+  event.stopPropagation();
+  const payment = state.payments.find(p => p.id === id);
+  if (!payment) return;
+  await apiDelete(`/payments/${id}`).catch(() => null);
+  state.payments = state.payments.filter(p => p.id !== id);
+  showToast('fa-solid fa-trash', `Διαγράφηκε: ${payment.name}`);
+  renderUpcomingPayments();
+}
+
+async function settlePayment(id, event) {
+  event.stopPropagation();
+  const payment = state.payments.find(p => p.id === id);
+  if (!payment) return;
+
+  const data = await apiPost(`/payments/${id}/settle`, {}).catch(() => null);
+  if (!data) return;
+
+  const idx = state.payments.findIndex(p => p.id === id);
+  if (idx !== -1) state.payments[idx] = data.payment;
+  state.transactions.unshift(data.transaction);
+  state.balance = data.balance;
+
+  const icon = payment.type === 'incoming' ? 'fa-solid fa-circle-arrow-down' : 'fa-solid fa-circle-arrow-up';
+  showToast(icon, `Εξοφλήθηκε: ${payment.name} — ${payment.type === 'incoming' ? '+' : '-'}${formatCurrency(payment.amount)}€`);
+  renderUpcomingPayments();
+  renderBalanceCard();
+}
+
 // ---- DEBTS VIEW ----
 function renderDebts() {
   renderDebtSummary();
@@ -1250,6 +1589,8 @@ function openAddSheet() {
   state.amountStr = '';
   state.selectedCategory = null;
   state.addType = 'expense';
+  state.isFuturePayment = false;
+  state.futurePaymentDueDate = '';
 
   const overlay = document.getElementById('add-sheet-overlay');
   overlay.classList.add('visible');
@@ -1260,20 +1601,51 @@ function openAddSheet() {
   const counter = document.getElementById('tx-title-counter');
   if (counter) counter.textContent = '0 / 40';
 
+  // Reset future-payment UI
+  const dateInput = document.getElementById('future-payment-date');
+  if (dateInput) dateInput.value = '';
+  renderFuturePaymentToggle();
+
   renderAddSheet();
 }
 
 function closeAddSheet() {
   state.addSheetOpen = false;
+  state.editingPaymentId = null;
   const overlay = document.getElementById('add-sheet-overlay');
   overlay.classList.remove('visible');
+  // Restore sheet title in case it was changed for editing
+  const headerEl = overlay.querySelector('.sheet-header h2');
+  if (headerEl) headerEl.textContent = 'Νέα Συναλλαγή';
 }
 
 function renderAddSheet() {
   renderTypeToggle();
   renderAmountDisplay();
   renderCategoryPicker();
+  renderFuturePaymentToggle();
   updateSaveButton();
+}
+
+function toggleFuturePayment() {
+  state.isFuturePayment = !state.isFuturePayment;
+  renderFuturePaymentToggle();
+}
+
+function renderFuturePaymentToggle() {
+  const toggle = document.getElementById('future-payment-toggle');
+  const sw = document.getElementById('future-payment-switch');
+  const dateWrap = document.getElementById('future-payment-date-wrap');
+  const saveBtn = document.getElementById('save-transaction-btn');
+
+  if (toggle) toggle.classList.toggle('active', state.isFuturePayment);
+  if (sw) sw.classList.toggle('on', state.isFuturePayment);
+  if (dateWrap) dateWrap.classList.toggle('visible', state.isFuturePayment);
+
+  // Update save button label
+  if (saveBtn) {
+    saveBtn.textContent = state.isFuturePayment ? 'Προγραμματισμός Πληρωμής' : 'Προσθήκη Συναλλαγής';
+  }
 }
 
 function renderTypeToggle() {
@@ -1365,6 +1737,43 @@ async function saveTransaction() {
   const cat = getCategoryInfo(state.selectedCategory);
   const title = (document.getElementById('transaction-title')?.value ?? '').trim();
 
+  // ── Future payment path ──
+  if (state.isFuturePayment) {
+    const dueDateEl = document.getElementById('future-payment-date');
+    const dueDate = dueDateEl ? dueDateEl.value : '';
+    const paymentType = state.addType === 'income' ? 'incoming' : 'outgoing';
+
+    const payload = {
+      name: title || cat.name,
+      category: state.selectedCategory,
+      type: paymentType,
+      amount,
+      dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+      note: title,
+      date: new Date().toISOString(),
+    };
+
+    if (state.editingPaymentId) {
+      const updated = await apiPut(`/payments/${state.editingPaymentId}`, payload).catch(() => null);
+      if (!updated) return;
+      const idx = state.payments.findIndex(p => p.id === state.editingPaymentId);
+      if (idx !== -1) state.payments[idx] = updated;
+      closeAddSheet();
+      showToast('fa-solid fa-circle-check', `Ενημερώθηκε: ${updated.name}`);
+    } else {
+      const payment = await apiPost('/payments', payload).catch(() => null);
+      if (!payment) return;
+      state.payments.unshift(payment);
+      closeAddSheet();
+      const icon = paymentType === 'incoming' ? 'fa-solid fa-calendar-check' : 'fa-solid fa-calendar-xmark';
+      showToast(icon, `Προγραμματίστηκε: ${payment.name} — ${paymentType === 'incoming' ? '+' : '-'}${formatCurrency(amount)}€`);
+    }
+
+    renderView(state.currentView);
+    return;
+  }
+
+  // ── Regular transaction path ──
   const payload = {
     name: title || cat.name,
     category: state.selectedCategory,
@@ -1651,6 +2060,13 @@ function closeTransactionDetail() {
   if (modal) modal.classList.remove('visible');
 }
 
+function isRunningAsPWA() {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true
+  );
+}
+
 async function deleteTransaction(id) {
   const data = await apiDelete(`/transactions/${id}`).catch(() => null);
   if (!data) return;
@@ -1682,12 +2098,24 @@ function handleSearch(query) {
 }
 
 // ---- INIT ----
-async function init() {
+async function init(bypassLoginCheck = false) {
   const acc = localStorage.getItem('evx-account');
   if (!acc) {
     window.location.href = '/login/?login=tazro';
     return;
+  } else if (!acc || !isRunningAsPWA()) {
+    document.getElementById("root-non-pwa").style.display = "block";
+    document.getElementById("root-main").style.display = "none";
+    if (bypassLoginCheck === true) {
+      document.getElementById("root-non-pwa").style.display = "none";
+      document.getElementById("root-main").style.display = "block";
+    } else {
+      return;
+    }
+    
   }
+
+
 
   const parsedAccount = JSON.parse(acc)
   document.getElementById("evx-pfp").src = parsedAccount.pfp || 'tazro.png';
@@ -1807,6 +2235,15 @@ async function init() {
     });
     // Prevent numpad key events from leaking into the text field
     titleInput.addEventListener('keydown', e => e.stopPropagation());
+  }
+
+  // Future payment date
+  const futureDateInput = document.getElementById('future-payment-date');
+  if (futureDateInput) {
+    futureDateInput.addEventListener('change', (e) => {
+      state.futurePaymentDueDate = e.target.value;
+    });
+    futureDateInput.addEventListener('keydown', e => e.stopPropagation());
   }
 
   // Search

@@ -1,8 +1,3 @@
-/* ============================================
-   Finavox — Apple-Style Finance App
-   Design System & Styles
-   ============================================ */
-
 /* --- Design Tokens --- */
 :root {
   /* Colors */
@@ -170,6 +165,31 @@ img {
   flex-direction: column;
   overflow: hidden;
   overscroll-behavior: none;
+}
+
+.app-container.center {
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.app-container.center img {
+  width: auto;
+  height: 80px;
+  object-fit: contain;
+}
+
+.app-container.center p {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.app-container.center span {
+  font-size: 16px;
+  color: var(--text-secondary);
+  text-align: center;
+  max-width: 280px;
+  text-align: center;
 }
 
 /* --- Main Content --- */
@@ -1119,6 +1139,133 @@ img {
   stroke: var(--red);
   stroke-width: 2;
   fill: none;
+}
+
+/* ── Settle button (mirrors delete btn, green tint) ── */
+.panel-settle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  background: var(--green-bg);
+  color: var(--green);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all var(--duration-fast) var(--ease-smooth);
+  margin-right: 8px;
+}
+
+.panel-settle-btn:active {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
+.panel-settle-btn svg {
+  width: 12px;
+  height: 12px;
+  stroke: var(--green);
+  stroke-width: 2.5;
+  fill: none;
+}
+
+/* ===== FUTURE PAYMENT ITEMS ===== */
+
+/* Left accent border by type */
+.fp-item {
+  position: relative;
+  border-left: 3px solid transparent;
+}
+
+.fp-item.fp-incoming {
+  border-left-color: var(--green);
+}
+
+.fp-item.fp-outgoing {
+  border-left-color: var(--red);
+}
+
+.fp-item.fp-overdue {
+  border-left-color: var(--orange);
+}
+
+/* Slightly softer background to visually separate from completed transactions */
+.fp-item .transaction-main {
+  opacity: 0.9;
+}
+
+/* Icon wrapper — needs relative positioning for the clock badge overlay */
+.fp-icon-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Small clock badge in bottom-right corner of the icon */
+.fp-clock-badge {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--bg);
+}
+
+.fp-clock-badge i {
+  font-size: 8px;
+  color: var(--text-tertiary);
+}
+
+/* Due-date line */
+.fp-due {
+  color: var(--text-tertiary) !important;
+}
+
+.fp-overdue-label {
+  color: var(--orange) !important;
+}
+
+.fp-warn-icon {
+  font-size: 11px;
+  margin-right: 3px;
+  color: var(--orange);
+}
+
+/* Amount dimmed to signal "not settled yet" */
+.fp-amount-dim {
+  opacity: 0.72;
+}
+
+/* Pill badge replacing the time text */
+.fp-pending-pill {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.fp-pill-in {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.fp-pill-out {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+/* date-group header for payment groups (emoji prefix stays, just inherit style) */
+.date-group-header {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .transaction-icon {
@@ -3419,6 +3566,260 @@ img {
   animation: btn-enable 0.35s var(--ease-spring);
 }
 
+
+/* ===== FUTURE PAYMENT TOGGLE (inside add-sheet) ===== */
+
+.future-payment-row {
+  margin: 0 0 var(--space-base);
+}
+
+.future-payment-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px var(--space-base);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-smooth);
+  user-select: none;
+}
+
+.future-payment-toggle:active {
+  background: var(--surface-hover);
+}
+
+.future-payment-toggle.active {
+  background: rgba(0, 122, 255, 0.10);
+}
+
+.future-payment-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.future-payment-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--blue-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.future-payment-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--blue);
+}
+
+.future-payment-label {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* iOS-style switch */
+.future-payment-switch {
+  width: 44px;
+  height: 26px;
+  border-radius: 100px;
+  background: var(--surface-active);
+  position: relative;
+  transition: background var(--duration-normal) var(--ease-smooth);
+  flex-shrink: 0;
+}
+
+.future-payment-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  transition: transform var(--duration-normal) var(--ease-spring);
+}
+
+.future-payment-switch.on {
+  background: var(--blue);
+}
+
+.future-payment-switch.on::after {
+  transform: translateX(18px);
+}
+
+/* Date picker row — hidden by default, slides in */
+.future-payment-date-wrap {
+  display: none;
+  padding: var(--space-sm) var(--space-base);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  margin-top: 4px;
+}
+
+.future-payment-date-wrap.visible {
+  display: block;
+}
+
+.future-payment-date-input {
+  width: 100%;
+  padding: 10px var(--space-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 15px;
+  border-radius: var(--radius-sm);
+  border: none;
+  outline: none;
+  color-scheme: dark;
+}
+
+/* ===== UPCOMING PAYMENTS (in Transactions view) ===== */
+
+.upcoming-payments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  cursor: pointer;
+  user-select: none;
+}
+
+.upcoming-payments-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.upcoming-payments-title i {
+  color: var(--blue);
+  font-size: 14px;
+}
+
+.upcoming-count {
+  background: var(--blue-bg);
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 100px;
+}
+
+.upcoming-payments-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.upcoming-sum {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.upcoming-sum.incoming { color: var(--green); }
+.upcoming-sum.outgoing { color: var(--red); }
+
+.upcoming-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transition: transform var(--duration-normal) var(--ease-smooth);
+}
+
+/* The list is hidden by default, expanded on tap */
+.upcoming-payments-list {
+  display: none;
+  padding-bottom: var(--space-sm);
+}
+
+.upcoming-payments-list.open {
+  display: block;
+}
+
+/* Payment card inside transactions view */
+.payment-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  margin: 0 var(--space-lg) 6px;
+  transition: background var(--duration-fast) var(--ease-smooth),
+              transform var(--duration-fast) var(--ease-smooth);
+}
+
+.payment-card:active {
+  transform: scale(0.98);
+  background: var(--surface-hover);
+}
+
+.payment-card.settled {
+  opacity: 0.52;
+}
+
+.payment-card.overdue {
+  border-left: 3px solid var(--red);
+}
+
+.payment-card-icon { flex-shrink: 0; }
+
+.payment-direction-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.payment-direction-badge.incoming { background: var(--green-bg); }
+.payment-direction-badge.outgoing { background: var(--red-bg); }
+.payment-direction-badge.incoming svg { stroke: var(--green); }
+.payment-direction-badge.outgoing svg { stroke: var(--red); }
+.payment-direction-badge svg { width: 18px; height: 18px; }
+
+.payment-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.payment-card-info .name {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.payment-due {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.payment-due.overdue-label { color: var(--red); }
+
+.payment-note {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Settle check button */
+.debt-action.settle { background: var(--green-bg); }
+.debt-action.settle svg { stroke: var(--green); }
 
 .tab-item.active.largetxt {
   border-radius: 16px;

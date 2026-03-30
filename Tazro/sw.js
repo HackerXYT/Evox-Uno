@@ -1,4 +1,4 @@
-const CACHE = 'finavox-v1';
+const CACHE = 'tazro-v1';
 const ASSETS = [
   './',
   './index.html',
