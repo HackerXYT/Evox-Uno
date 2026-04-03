@@ -96,19 +96,24 @@ function twoFactorAuthCheck() {
 function login() {
     const identifier = document.getElementById('id').value
     const password = document.getElementById('pswd').value
+    const username = document.getElementById('username').value
+    const firstName = document.getElementById('firstName').value
+    const lastName = document.getElementById('lastName').value
     if (!identifier || !password) {
         alert("Please enter both email and password.");
         return;
     }
-    fetch("https://uno.evox.uno/login", {
+    fetch("https://uno.evox.uno/register", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             "X-Forwarded-For": "1.2.3.4"
         },
         body: JSON.stringify({
-            identifier,
-            password
+            email: identifier,
+            password,
+            username,
+            name: `${firstName} ${lastName}`
         })
     })
         .then(res => res.json())
@@ -123,46 +128,41 @@ function login() {
                 name: data.name
             };
             if (data.success) {
-                if (data.twofactordone === true) {
-                    document.getElementById('login').style.display = 'none';
-                    document.getElementById('2fa').style.display = 'none';
+                document.getElementById('login').style.display = 'none';
+                document.getElementById('2fa').style.display = 'none';
+                document.getElementById("loading").style.display = 'flex'
+                if (isTazro) {
+                    document.getElementById("signintext").innerText = 'Getting your Tazro account ready...'
                     document.getElementById("loading").style.display = 'flex'
-                    if (isTazro) {
-                        document.getElementById("signintext").innerText = 'Getting your Tazro account ready...'
-                        document.getElementById("loading").style.display = 'flex'
-                        const name = tempAccount.name !== "Unknown" ? tempAccount.name.split(" ")[0] : tempAccount.username
-                        const tazroData = {
-                            user: { name, initial: name[0] },
-                            balance: 0,
-                            savings: 0,
-                            currentView: 'home',
-                            selectedDate: new Date(),
-                            addSheetOpen: false,
-                            debtSheetOpen: false,
-                            goalSheetOpen: false,
-                            addType: 'expense',
-                            amountStr: '',
-                            selectedCategory: null,
-                            debtType: 'owe',
-                            debtViewTab: 'owe',
-                            editingDebtId: null,
-                            transactionFilter: 'all',
-                            searchQuery: '',
-                            transactions: [],
-                            savingsGoals: [],
-                            debts: [],
-                        }
-                        localStorage.setItem("tazroState", JSON.stringify(tazroData, null, 2))
-                        setTimeout(function () {
-                            redirect()
-                        }, 3000)
-                    } else {
-                        document.getElementById("loading").style.display = 'flex'
-                        redirect()
+                    const name = tempAccount.name !== "Unknown" ? tempAccount.name.split(" ")[0] : tempAccount.username
+                    const tazroData = {
+                        user: { name, initial: name[0] },
+                        balance: 0,
+                        savings: 0,
+                        currentView: 'home',
+                        selectedDate: new Date(),
+                        addSheetOpen: false,
+                        debtSheetOpen: false,
+                        goalSheetOpen: false,
+                        addType: 'expense',
+                        amountStr: '',
+                        selectedCategory: null,
+                        debtType: 'owe',
+                        debtViewTab: 'owe',
+                        editingDebtId: null,
+                        transactionFilter: 'all',
+                        searchQuery: '',
+                        transactions: [],
+                        savingsGoals: [],
+                        debts: [],
                     }
+                    localStorage.setItem("tazroState", JSON.stringify(tazroData, null, 2))
+                    setTimeout(function () {
+                        redirect()
+                    }, 3000)
                 } else {
-                    document.getElementById("greeting").innerText = `Welcome back, ${data.name !== "Unknown" ? data.name.split(" ")[0] : data.username}`
-                    twoFactorAuth();
+                    document.getElementById("loading").style.display = 'flex'
+                    redirect()
                 }
             } else {
                 alert("Login failed: " + (data.msg || data.message || "Unknown error"));
@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (login === 'tazro') {
         isTazro = true;
         document.getElementById("logo-row").querySelectorAll("*").forEach(el => el.style.display = 'flex');
-        document.getElementById("heading").innerText = "Sign up to continue on Tazro"
+        document.getElementById("heading").innerText = "Login to continue on Tazro"
     }
 
     setTimeout(() => {
@@ -204,29 +204,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }, 330)
 })
 
-function signUp() {
-    window.location.href = '/login/register/?login=' + (isTazro ? 'tazro' : 'uno')
+function signIn() {
+    window.location.href = '../' + (isTazro ? '?login=tazro' : '')
 }
 
-const CLIENT_ID = "314460881843-5k3d8113ch5clklju6rhu23hgmilnsdv.apps.googleusercontent.com";
-const REDIRECT_URI = "https://evox.uno/login/auth.html";
-
-document.getElementById("googleLogin").onclick = () => {
-
-    if (isTazro) {
-        sessionStorage.setItem("tazroRedirect", "true");
-    }
-    const url =
-        "https://accounts.google.com/o/oauth2/v2/auth?" +
-        new URLSearchParams({
-            client_id: CLIENT_ID,
-            redirect_uri: REDIRECT_URI,
-            response_type: "code",
-            scope: "openid email profile",
-            access_type: "offline",
-            prompt: "consent"
-        });
-
-    window.location.href = url;
-
-};

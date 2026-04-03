@@ -1,36 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
 </head>
+
 <body>
-    <p>wait..</p>
+  <p>wait..</p>
 </body>
 <script>
 
-const params = new URLSearchParams(window.location.search);
-const code = params.get("code");
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  let tempAccount = null;
+  fetch("https://uno.evox.uno/exchange", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ code })
+  })
+    .then(res => res.json())
+    .then(data => {
 
-fetch("https://hackathon-server.evoxs.xyz/exchange", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({ code })
-})
-.then(res => res.json())
-.then(data => {
+      tempAccount = {
+        email: data.email,
+        username: data.username,
+        password: password,
+        evxToken: data.evxToken,
+        complete: data,
+        name: data.name
+      };
+      let isTazro = false;
+      if (sessionStorage.getItem("tazroRedirect")) {
+        sessionStorage.removeItem("tazroRedirect");
+        isTazro = true;
+      }
+      console.log(data);
+      if (data.success) {
+        if (isTazro) {
+          const name = tempAccount.name !== "Unknown" ? tempAccount.name.split(" ")[0] : tempAccount.username
+          const tazroData = {
+            user: { name, initial: name[0] },
+            balance: 0,
+            savings: 0,
+            currentView: 'home',
+            selectedDate: new Date(),
+            addSheetOpen: false,
+            debtSheetOpen: false,
+            goalSheetOpen: false,
+            addType: 'expense',
+            amountStr: '',
+            selectedCategory: null,
+            debtType: 'owe',
+            debtViewTab: 'owe',
+            editingDebtId: null,
+            transactionFilter: 'all',
+            searchQuery: '',
+            transactions: [],
+            savingsGoals: [],
+            debts: [],
+          }
+          localStorage.setItem("tazroState", JSON.stringify(tazroData, null, 2))
+          redirect()
+        } else {
+          redirect()
+        }
+      } else {
+        alert("Login failed: " + data.message);
+      }
 
-  console.log(data);
+    });
 
-  if(data.success){
-    localStorage.setItem("user", JSON.stringify(data.user));
-    window.location.href = "/login/";
+  function redirect() {
+    localStorage.setItem("evx-account", JSON.stringify(tempAccount.complete, null, 2))
+
+    if (isTazro) {
+      setTimeout(function () {
+        window.location.href = '/Tazro'
+      }, 500)
+    } else {
+      setTimeout(function () {
+        window.location.href = '/'
+      }, 500)
+    }
+
   }
 
-});
-
 </script>
+
 </html>
