@@ -28,10 +28,11 @@
       tempAccount = {
         email: data.email,
         username: data.username,
-        password: password,
         evxToken: data.evxToken,
         complete: data,
-        name: data.name
+        name: data.name,
+        pfp: data.pfp,
+        googleAuth: data.googleAuth
       };
       let isTazro = false;
       if (sessionStorage.getItem("tazroRedirect")) {
