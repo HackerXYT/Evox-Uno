@@ -2507,29 +2507,36 @@ function handleSearch(query) {
 }
 
 // ---- INIT ----
-async function init(bypassLoginCheck = false) {
+async function init(allowGuest = false) {
   const acc = localStorage.getItem('evx-account');
+  const inPWA = isRunningAsPWA();
+  const nonPwaRoot = document.getElementById('root-non-pwa');
+  const mainRoot = document.getElementById('root-main');
+
   if (!acc) {
-    window.location.href = '/login/?login=tazro';
-    return;
-  } else if (!acc || !isRunningAsPWA()) {
-    document.getElementById("root-non-pwa").style.display = "block";
-    document.getElementById("root-main").style.display = "none";
-    if (bypassLoginCheck === true) {
-      document.getElementById("root-non-pwa").style.display = "none";
-      document.getElementById("root-main").style.display = "block";
-    } else {
+    if (inPWA || allowGuest) {
+      window.location.href = '/login/?login=tazro';
       return;
     }
-    
+
+    if (nonPwaRoot) nonPwaRoot.style.display = 'block';
+    if (mainRoot) mainRoot.style.display = 'none';
+
+    const ignoreBtn = document.getElementById('non-pwa-ignore-btn');
+    if (ignoreBtn) {
+      ignoreBtn.addEventListener('click', () => init(true), { once: true });
+    }
+    return;
   }
 
+  if (nonPwaRoot) nonPwaRoot.style.display = 'none';
+  if (mainRoot) mainRoot.style.display = 'block';
 
-
-  const parsedAccount = JSON.parse(acc)
-  document.getElementById("evx-pfp").src = parsedAccount.pfp || 'tazro.png';
-
-  await loadData();
+  if (acc) {
+    const parsedAccount = JSON.parse(acc)
+    document.getElementById("evx-pfp").src = parsedAccount.pfp || 'tazro.png';
+    await loadData();
+  }
 
   // Always start on today's local date to avoid timezone-shifted persisted values.
   state.selectedDate = startOfDay(new Date());
@@ -2742,7 +2749,7 @@ function setupAnimateIn(container) {
 }
 
 // Start
-document.addEventListener('DOMContentLoaded', init(true));
+document.addEventListener('DOMContentLoaded', () => init());
 
 
 document.getElementById("transaction-title").addEventListener("focus", function () {
