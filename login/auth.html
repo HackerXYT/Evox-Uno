@@ -4,11 +4,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <title>Waiting</title>
+  <link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
-  <p>wait..</p>
+  <main class="login-container" style="opacity: 1;">
+    <div class="loader loader--style2" title="1" style="height: auto;padding:0;margin:0;margin-bottom: 20px;">
+      <svg version="1.1" id="loader-1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+        x="0px" y="0px" width="40px" height="40px" viewBox="0 0 50 50" style="enable-background:new 0 0 50 50;"
+        xml:space="preserve">
+        <path fill="#fff"
+          d="M25.251,6.461c-10.318,0-18.683,8.365-18.683,18.683h4.068c0-8.071,6.543-14.615,14.615-14.615V6.461z">
+          <animateTransform attributeType="xml" attributeName="transform" type="rotate" from="0 25 25" to="360 25 25"
+            dur="0.6s" repeatCount="indefinite" />
+        </path>
+      </svg>
+    </div>
+    <h1>Welcome to Uno!</h1>
+    <p>Exchanging code for tokens...</p>
+    <span style="margin-top: 10px;color: #ff5757;text-align: center;" id="errors"></span>
+  </main>
 </body>
 <script>
 
@@ -25,6 +41,11 @@
   })
     .then(res => res.json())
     .then(data => {
+      if (!code) {
+        document.getElementById("errors").innerText = "No code provided in URL.";
+        console.log("No code provided");
+        return;
+      }
 
       tempAccount = {
         email: data.email,
@@ -35,7 +56,7 @@
         pfp: data.pfp,
         googleAuth: data.googleAuth
       };
-      
+
       if (sessionStorage.getItem("tazroRedirect")) {
         sessionStorage.removeItem("tazroRedirect");
         isTazro = true;
@@ -71,10 +92,13 @@
           redirect()
         }
       } else {
-        alert("Login failed: " + data.message);
+        document.getElementById("errors").innerText = `Login failed: ${data.message || "Unknown error"}`;
       }
 
-    });
+    }).catch(err => {
+      console.error(err);
+      document.getElementById("errors").innerText = "Server appears to be down. Please try again later.";
+    })
 
   function redirect() {
     localStorage.setItem("evx-account", JSON.stringify(tempAccount.complete, null, 2))
