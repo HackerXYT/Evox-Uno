@@ -1180,15 +1180,19 @@ function transactionItemHTML(t) {
   const sign = isExpense ? '-' : '+';
   const cls = isExpense ? 'expense' : 'income';
 
+  const iconHTML = t.peerPfp
+    ? `<div class="transaction-icon tx-peer-icon"><img src="${escapeHtml(t.peerPfp)}" alt="" onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-user\\'></i>'"></div>`
+    : `<div class="transaction-icon" style="background:${cat.bg}">${renderFaIcon(cat.icon, 'fa-solid fa-tag')}</div>`;
+
   return `
     <div class="transaction-item" data-id="${t.id}" onclick="toggleTransactionDetail(${t.id})">
 
       <!-- ── Main row ── -->
       <div class="transaction-main">
-        <div class="transaction-icon" style="background:${cat.bg}">${renderFaIcon(cat.icon, 'fa-solid fa-tag')}</div>
+        ${iconHTML}
         <div class="transaction-info">
           <div class="name">${t.name}</div>
-          <div class="category">${cat.name} · ${formatDate(t.date)}</div>
+          <div class="category">${t.peerPfp ? (isExpense ? 'Αποστολή' : 'Εισαγωγή') : cat.name} · ${formatDate(t.date)}</div>
         </div>
         <div class="transaction-amount">
           <div class="amount ${cls}">${sign}${formatCurrency(t.amount)}€</div>
@@ -2720,6 +2724,44 @@ async function init(allowGuest = false) {
   updateTime();
   setInterval(updateTime, 60000);
 
+  // Chat sheet
+  const chatSheetOverlay = document.getElementById('chat-sheet-overlay');
+  if (chatSheetOverlay) {
+    chatSheetOverlay.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeChatSheet();
+    });
+  }
+  document.querySelectorAll('.chat-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchChatTab(tab.dataset.chatTab));
+  });
+  const chatInput = document.getElementById('chat-input');
+  if (chatInput) {
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendChatMessage();
+      e.stopPropagation();
+    });
+    chatInput.addEventListener('keyup', e => e.stopPropagation());
+  }
+  const friendsSearchInput = document.getElementById('friends-search');
+  if (friendsSearchInput) {
+    friendsSearchInput.addEventListener('input', (e) => {
+      clearTimeout(_friendSearchTimeout);
+      _friendSearchTimeout = setTimeout(() => searchFriends(e.target.value.trim()), 420);
+    });
+    friendsSearchInput.addEventListener('keydown', e => e.stopPropagation());
+  }
+  const sendFriendModal = document.getElementById('send-friend-modal');
+  if (sendFriendModal) {
+    sendFriendModal.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeSendFriendModal();
+    });
+  }
+  document.querySelectorAll('#send-numpad [data-send-key]').forEach(btn => {
+    btn.addEventListener('click', () => handleSendNumpad(btn.dataset.sendKey));
+  });
+  const sendFriendNoteInput = document.getElementById('send-friend-note');
+  if (sendFriendNoteInput) sendFriendNoteInput.addEventListener('keydown', e => e.stopPropagation());
+
   // Initial render
   renderHome();
   updateGoalIconPreview();
@@ -2746,6 +2788,395 @@ function setupAnimateIn(container) {
   }, { threshold: 0.1 });
 
   elements.forEach(el => observer.observe(el));
+}
+
+// ---- CHAT ----
+const chatState = {
+  messages: [],
+  activeTab: 'ai',
+  isTyping: false,
+  selectedFriend: null,
+  sendAmountStr: '',
+};
+
+function openChatSheet() {
+  const overlay = document.getElementById('chat-sheet-overlay');
+  if (!overlay) return;
+  overlay.classList.add('visible');
+  if (chatState.messages.length === 0) {
+    const firstName = (state.user.name || 'φίλε').split(' ')[0];
+    chatState.messages.push({
+      role: 'ai',
+      text: `Γεια σου, ${firstName}! 👋 Είμαι ο <strong>Tazro AI</strong>. Μπορώ να σε βοηθήσω με ερωτήσεις για το υπόλοιπό σου, τα χρέη σου, τους στόχους αποταμίευσης και τα μηνιαία έξοδα. Τι θέλεις να μάθεις;`,
+    });
+  }
+  renderChatMessages();
+  setTimeout(() => {
+    const input = document.getElementById('chat-input');
+    if (input) input.focus();
+  }, 420);
+}
+
+function closeChatSheet() {
+  const overlay = document.getElementById('chat-sheet-overlay');
+  if (overlay) overlay.classList.remove('visible');
+}
+
+function switchChatTab(tab) {
+  chatState.activeTab = tab;
+  document.querySelectorAll('.chat-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.chatTab === tab);
+  });
+  const aiTab = document.getElementById('chat-ai-tab');
+  const friendsTab = document.getElementById('chat-friends-tab');
+  if (aiTab) aiTab.classList.toggle('active', tab === 'ai');
+  if (friendsTab) friendsTab.classList.toggle('active', tab === 'friends');
+}
+
+function renderChatMessages() {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+
+  container.innerHTML = chatState.messages.map(msg => {
+    if (msg.role === 'ai') {
+      return `
+        <div class="chat-bubble-wrap ai">
+          <div class="chat-ai-avatar">
+            <i class="fa-solid fa-robot" style="font-size:13px"></i>
+          </div>
+          <div class="chat-bubble ai">${msg.text.replaceAll(/\*\*/g, '')}</div>
+        </div>`;
+    }
+    return `
+      <div class="chat-bubble-wrap user">
+        <div class="chat-bubble user">${escapeHtml(msg.text)}</div>
+      </div>`;
+  }).join('');
+
+  if (chatState.isTyping) {
+    container.innerHTML += `
+      <div class="chat-bubble-wrap ai">
+        <div class="chat-ai-avatar">
+          <i class="fa-solid fa-robot" style="font-size:13px"></i>
+        </div>
+        <div class="chat-bubble ai typing">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>`;
+  }
+
+  container.scrollTop = container.scrollHeight;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text || chatState.isTyping) return;
+
+  input.value = '';
+  chatState.messages.push({ role: 'user', text });
+  chatState.isTyping = true;
+  renderChatMessages();
+
+  await streamChatResponse(text);
+}
+
+async function streamChatResponse(userMessage) {
+  let msgIndex = -1;
+
+  try {
+    const response = await fetch(API + '/chat', {
+      method: 'POST',
+      headers: withAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ message: userMessage }),
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // hold incomplete line for next chunk
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (payload === '[DONE]') break;
+
+        const parsed = JSON.parse(payload);
+        if (parsed.error) throw new Error(parsed.error);
+
+        if (parsed.delta) {
+          if (msgIndex === -1) {
+            // First token — swap typing indicator for a real bubble
+            chatState.isTyping = false;
+            chatState.messages.push({ role: 'ai', text: '' });
+            msgIndex = chatState.messages.length - 1;
+          }
+          chatState.messages[msgIndex].text += parsed.delta;
+          renderChatMessages();
+        }
+      }
+    }
+
+    // Stream ended with no tokens (e.g. empty response)
+    if (msgIndex === -1) throw new Error('empty');
+
+  } catch (_) {
+    chatState.isTyping = false;
+    if (msgIndex === -1) {
+      // Server unreachable — fall back to local AI
+      const { income, expenses } = getMonthTotals();
+      const ctx = {
+        balance: state.balance, savings: state.savings,
+        debts: state.debts.map(d => ({ name: d.name, amount: d.amount, type: d.type })),
+        goals: state.savingsGoals.map(g => ({ name: g.name, target: g.target, current: g.current || 0 })),
+        monthIncome: income, monthExpenses: expenses,
+      };
+      chatState.messages.push({ role: 'ai', text: generateLocalAIResponse(userMessage, ctx) });
+    }
+    renderChatMessages();
+  }
+}
+
+function generateLocalAIResponse(message, ctx) {
+  const msg = message.toLowerCase();
+
+  if (msg.includes('υπόλοιπο') || msg.includes('balance') || msg.includes('πόσα λεφτ') || msg.includes('πόσα χρήματ') || msg.includes('έχω;')) {
+    return `Το τρέχον υπόλοιπό σου είναι <strong>${formatCurrency(ctx.balance)}€</strong> και η αποταμίευσή σου <strong>${formatCurrency(ctx.savings)}€</strong>. Σύνολο: <strong>${formatCurrency(ctx.balance + ctx.savings)}€</strong>.`;
+  }
+
+  if (msg.includes('χρωστ') || msg.includes('χρέ') || msg.includes('debt')) {
+    const owe = ctx.debts.filter(d => d.type === 'owe');
+    const lent = ctx.debts.filter(d => d.type === 'lent');
+    if (ctx.debts.length === 0) return 'Δεν έχεις καταγεγραμμένα χρέη αυτή τη στιγμή. 🎉';
+    const totalOwe = owe.reduce((s, d) => s + d.amount, 0);
+    const totalLent = lent.reduce((s, d) => s + d.amount, 0);
+    let r = `Χρωστάς συνολικά <strong>${formatCurrency(totalOwe)}€</strong> και σου χρωστούν <strong>${formatCurrency(totalLent)}€</strong>.`;
+    if (owe.length) r += `<br><br>Χρωστάς σε: ${owe.map(d => `${escapeHtml(d.name)} (${formatCurrency(d.amount)}€)`).join(', ')}.`;
+    if (lent.length) r += `<br>Σου χρωστούν: ${lent.map(d => `${escapeHtml(d.name)} (${formatCurrency(d.amount)}€)`).join(', ')}.`;
+    return r;
+  }
+
+  if (msg.includes('στόχ') || msg.includes('goal') || msg.includes('αποταμ')) {
+    if (ctx.goals.length === 0) return 'Δεν έχεις ορίσει στόχους αποταμίευσης ακόμα. Μπορείς να προσθέσεις από την καρτέλα <strong>Αποταμίευση</strong>!';
+    const lines = ctx.goals.map(g => {
+      const pct = g.target > 0 ? Math.round((g.current / g.target) * 100) : 0;
+      return `<strong>${escapeHtml(g.name)}</strong>: ${formatCurrency(g.current)}€ / ${formatCurrency(g.target)}€ (${pct}%)`;
+    }).join('<br>');
+    return `Οι στόχοι σου:<br>${lines}`;
+  }
+
+  if (msg.includes('έξοδ') || msg.includes('δαπάν') || msg.includes('ξόδεψ') || msg.includes('expense') || msg.includes('spending')) {
+    const net = ctx.monthIncome - ctx.monthExpenses;
+    const sign = net >= 0 ? '+' : '';
+    return `Αυτόν τον μήνα έχεις ξοδέψει <strong>${formatCurrency(ctx.monthExpenses)}€</strong> και έχεις λάβει <strong>${formatCurrency(ctx.monthIncome)}€</strong> εισοδήματος. Καθαρό αποτέλεσμα: <strong>${sign}${formatCurrency(net)}€</strong>.`;
+  }
+
+  if (msg.includes('εισόδ') || msg.includes('income') || msg.includes('μισθ') || msg.includes('βγάζ')) {
+    return `Αυτόν τον μήνα το συνολικό σου εισόδημα είναι <strong>${formatCurrency(ctx.monthIncome)}€</strong>.`;
+  }
+
+  if (msg.includes('αποταμίευ') || msg.includes('saving')) {
+    return `Η αποταμίευσή σου βρίσκεται στα <strong>${formatCurrency(ctx.savings)}€</strong>. ${ctx.monthIncome > 0 ? `Αποταμιεύεις περίπου ${Math.max(0, Math.round(((ctx.monthIncome - ctx.monthExpenses) / ctx.monthIncome) * 100))}% του εισοδήματός σου αυτόν τον μήνα.` : ''}`;
+  }
+
+  if (msg.includes('συμβουλ') || msg.includes('tip') || msg.includes('πώς') || msg.includes('βοήθ')) {
+    const rate = ctx.monthIncome > 0 ? ((ctx.monthIncome - ctx.monthExpenses) / ctx.monthIncome) * 100 : 0;
+    if (rate < 10) return `💡 Αποταμιεύεις μόνο ${Math.max(0, rate.toFixed(0))}% του εισοδήματός σου αυτόν τον μήνα. Ο συνιστώμενος στόχος είναι <strong>20%</strong>. Δες πού μπορείς να μειώσεις τα έξοδα!`;
+    if (ctx.debts.filter(d => d.type === 'owe').length > 0) return `💡 Έχεις ενεργά χρέη. Σκέψου να εξοφλήσεις πρώτα αυτά με το υψηλότερο ποσό για να ελαφρύνεις τον προϋπολογισμό σου.`;
+    return `💡 Αποταμιεύεις ${rate.toFixed(0)}% του εισοδήματός σου — καλή δουλειά! Σκέψου να θέσεις έναν στόχο για να αξιοποιήσεις καλύτερα την αποταμίευσή σου.`;
+  }
+
+  if (msg.includes('γεια') || msg === 'hello' || msg === 'hi' || msg.startsWith('hi ')) {
+    return `Γεια σου! 😊 Πώς μπορώ να σε βοηθήσω; Μπορώ να σου πω για το <strong>υπόλοιπό</strong> σου, τα <strong>χρέη</strong> σου, τους <strong>στόχους</strong> ή τα έξοδα του μήνα.`;
+  }
+
+  const fallbacks = [
+    `Μπορώ να σε βοηθήσω με ερωτήσεις για το <strong>υπόλοιπό</strong> σου, τα <strong>χρέη</strong>, τους <strong>στόχους</strong> αποταμίευσης ή τα <strong>μηνιαία έξοδα</strong>. Τι θέλεις να μάθεις;`,
+    `Δεν κατάλαβα την ερώτηση. Δοκίμασε να ρωτήσεις για το <em>υπόλοιπό</em> σου, τα <em>χρέη</em> ή τις <em>αποταμιεύσεις</em> σου.`,
+  ];
+  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+}
+
+// ---- FRIENDS / SEND MONEY ----
+let _friendSearchTimeout = null;
+
+function getRecentPeers() {
+  const seen = new Set();
+  const peers = [];
+  for (const tx of state.transactions) {
+    if (!tx.peerPfp) continue;
+    const key = tx.peerPfp;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // Name may include ': note' suffix — strip it to get the display name
+    const rawName = tx.name || '';
+    const name = rawName.includes(': ') ? rawName.split(': ')[0] : rawName;
+    peers.push({
+      id: tx.peerId || null,
+      username: tx.peerUsername || name,
+      name,
+      pfp: tx.peerPfp,
+    });
+    if (peers.length >= 8) break;
+  }
+  return peers;
+}
+
+async function searchFriends(query) {
+  const list = document.getElementById('friends-list');
+  if (!list) return;
+  if (!query || query.length < 2) {
+    const recent = getRecentPeers();
+    if (recent.length > 0) {
+      const header = `<div class="friends-section-label">Πρόσφατοι</div>`;
+      renderFriendResults(recent, header);
+    } else {
+      list.innerHTML = `
+        <div class="friends-empty">
+          <i class="fa-solid fa-user-plus" style="font-size:28px;color:var(--text-tertiary)"></i>
+          <p>Αναζήτησε χρήστες από το Evox Ecosystem για να στείλεις χρήματα.</p>
+        </div>`;
+    }
+    return;
+  }
+
+  list.innerHTML = `<div class="friends-empty"><i class="fa-solid fa-spinner fa-spin" style="font-size:24px;color:var(--text-tertiary)"></i></div>`;
+
+  try {
+    const results = await apiGet(`/users/search?q=${encodeURIComponent(query)}`);
+    renderFriendResults(Array.isArray(results) ? results : (results.users || []));
+  } catch (_) {
+    list.innerHTML = `<div class="friends-empty"><i class="fa-solid fa-triangle-exclamation" style="color:var(--text-tertiary)"></i><p>Σφάλμα αναζήτησης. Δοκίμασε ξανά.</p></div>`;
+  }
+}
+
+function renderFriendResults(users, headerHTML = '') {
+  const list = document.getElementById('friends-list');
+  if (!list) return;
+  if (!users || users.length === 0) {
+    list.innerHTML = `<div class="friends-empty"><i class="fa-solid fa-user-slash" style="font-size:28px;color:var(--text-tertiary)"></i><p>Δεν βρέθηκαν χρήστες.</p></div>`;
+    return;
+  }
+
+  list.innerHTML = headerHTML + users.map(u => {
+    const safeData = encodeURIComponent(JSON.stringify(u));
+    return `
+      <div class="friend-item">
+        <div class="friend-avatar">
+          ${u.pfp ? `<img src="${escapeHtml(u.pfp)}" alt="" onerror="this.remove()">` : escapeHtml((u.name || u.username || '?')[0].toUpperCase())}
+        </div>
+        <div class="friend-info">
+          <div class="friend-name">${escapeHtml(u.name || u.username || 'Χρήστης')}</div>
+          <div class="friend-username">@${escapeHtml(u.username || '')}</div>
+        </div>
+        <button class="friend-send-btn" data-user="${safeData}">Αποστολή</button>
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('.friend-send-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const user = JSON.parse(decodeURIComponent(btn.dataset.user));
+      openSendFriendModal(user);
+    });
+  });
+}
+
+function handleSendNumpad(key) {
+  if (key === 'delete') {
+    chatState.sendAmountStr = chatState.sendAmountStr.slice(0, -1);
+  } else if (key === '.') {
+    if (!chatState.sendAmountStr.includes('.')) {
+      chatState.sendAmountStr += chatState.sendAmountStr ? '.' : '0.';
+    }
+  } else {
+    const parts = chatState.sendAmountStr.split('.');
+    if (parts[1] && parts[1].length >= 2) return;
+    if (chatState.sendAmountStr.replace('.', '').length >= 7) return;
+    chatState.sendAmountStr += key;
+  }
+  const el = document.getElementById('send-amount-value');
+  if (el) el.textContent = chatState.sendAmountStr || '0';
+  const btn = document.getElementById('send-friend-btn');
+  if (btn) btn.disabled = !(parseFloat(chatState.sendAmountStr) > 0);
+}
+
+function openSendFriendModal(user) {
+  chatState.selectedFriend = user;
+  chatState.sendAmountStr = '';
+
+  const avatarEl = document.getElementById('send-friend-avatar');
+  if (avatarEl) {
+    avatarEl.innerHTML = user.pfp
+      ? `<img src="${escapeHtml(user.pfp)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+      : escapeHtml((user.name || user.username || '?')[0].toUpperCase());
+  }
+  const nameEl = document.getElementById('send-friend-name');
+  if (nameEl) nameEl.textContent = user.name || user.username || 'Χρήστης';
+
+  const amountEl = document.getElementById('send-amount-value');
+  if (amountEl) amountEl.textContent = '0';
+  const noteEl = document.getElementById('send-friend-note');
+  if (noteEl) noteEl.value = '';
+  const btn = document.getElementById('send-friend-btn');
+  if (btn) btn.disabled = true;
+
+  document.getElementById('send-friend-modal').classList.add('visible');
+}
+
+function closeSendFriendModal() {
+  document.getElementById('send-friend-modal').classList.remove('visible');
+  chatState.selectedFriend = null;
+  chatState.sendAmountStr = '';
+}
+
+async function confirmSendToFriend() {
+  const friend = chatState.selectedFriend;
+  if (!friend) return;
+
+  const amount = parseFloat(chatState.sendAmountStr);
+  const note = (document.getElementById('send-friend-note').value || '').trim();
+
+  if (!amount || amount <= 0) {
+    showToast('fa-solid fa-triangle-exclamation', 'Συμπλήρωσε έγκυρο ποσό');
+    return;
+  }
+  if (amount > state.balance) {
+    showToast('fa-solid fa-triangle-exclamation', 'Ανεπαρκές υπόλοιπο');
+    return;
+  }
+
+  try {
+    const data = await apiPost('/send', {
+      recipientId: friend.id,
+      amount,
+      note: note,
+    });
+    if (data && data.balance !== undefined) state.balance = data.balance;
+    else state.balance -= amount;
+    renderBalanceCard();
+    closeSendFriendModal();
+    showToast('fa-solid fa-circle-check', `Εστάλησαν ${formatCurrency(amount)}€ στον/ην ${escapeHtml(friend.name || friend.username || '')}`);
+  } catch (_) { /* apiFetch already shows toast */ }
 }
 
 // Start
