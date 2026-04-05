@@ -125,6 +125,48 @@ async function loadData() {
   if (getSavingsHistory().length === 0) recordSavingsSnapshot();
 }
 
+// ---- SSE ----
+let _sseSource = null;
+
+function initSSE() {
+  const token = getAuthToken();
+  if (!token) return;
+  if (_sseSource) { _sseSource.close(); _sseSource = null; }
+
+  const dot = document.getElementById('sse-dot');
+  const url = `${API}/stream?evxToken=${encodeURIComponent(token)}`;
+  _sseSource = new EventSource(url);
+
+  _sseSource.addEventListener('update', (e) => {
+    const d = JSON.parse(e.data);
+    if (d.balance !== undefined) state.balance = d.balance;
+    if (d.savings !== undefined) state.savings = d.savings;
+    if (Array.isArray(d.transactions)) state.transactions = d.transactions;
+    renderBalanceCard();
+    renderFlowCard();
+    renderStats();
+    if (Array.isArray(d.transactions)) {
+      renderRecentTransactions();
+      if (state.currentView === 'transactions') renderTransactions();
+    }
+  });
+
+  _sseSource.addEventListener('aiTips', (e) => {
+    const d = JSON.parse(e.data);
+    if (Array.isArray(d.aiTips)) {
+      const forecasts = d.aiTips.filter(t => t.type === 'forecast');
+      const tips      = d.aiTips.filter(t => t.type === 'tips');
+      if (forecasts.length || tips.length) renderAIInsights();
+    }
+  });
+
+  _sseSource.onopen = () => { if (dot) { dot.className = 'sse-dot sse-dot--on'; dot.title = 'Live'; } };
+  _sseSource.onerror = () => {
+    if (dot) { dot.className = 'sse-dot sse-dot--off'; dot.title = 'Offline'; }
+    // auto-reconnect: browser retries EventSource by default
+  };
+}
+
 // ---- HELPERS ----
 function formatCurrency(n) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2540,6 +2582,7 @@ async function init(allowGuest = false) {
     const parsedAccount = JSON.parse(acc)
     document.getElementById("evx-pfp").src = parsedAccount.pfp || 'tazro.png';
     await loadData();
+    initSSE();
   }
 
   // Always start on today's local date to avoid timezone-shifted persisted values.

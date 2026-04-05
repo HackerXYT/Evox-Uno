@@ -502,6 +502,21 @@ img {
 .home-header-icons {
   display: flex;
   gap: var(--space-md);
+  align-items: center;
+}
+
+.sse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.4s;
+}
+.sse-dot--on  { background: #30D158; box-shadow: 0 0 0 2px #30D15830; animation: sse-pulse 2s infinite; }
+.sse-dot--off { background: #8E8E93; }
+@keyframes sse-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px #30D15830; }
+  50%       { box-shadow: 0 0 0 5px #30D15810; }
 }
 
 .icon-btn {
