@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="el">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Location Picker</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f1a;
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #map {
+      flex: 1;
+      cursor: crosshair;
+    }
+
+    #panel {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 15, 26, 0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 14px 20px;
+      min-width: 280px;
+      max-width: calc(100vw - 32px);
+      text-align: center;
+      z-index: 10;
+      transition: all 0.3s ease;
+    }
+
+    #panel h2 {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      color: rgba(255, 255, 255, 0.4);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    #location-name {
+      font-size: 17px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3;
+    }
+
+    #coords {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.3);
+      margin-top: 4px;
+      font-family: monospace;
+    }
+
+    #hint {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 15, 26, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 40px;
+      padding: 10px 20px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.55);
+      z-index: 10;
+      pointer-events: none;
+      transition: opacity 0.4s;
+    }
+
+    #hint.hidden {
+      opacity: 0;
+    }
+
+    .marker-pulse {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #6c63ff;
+      box-shadow: 0 0 0 0 rgba(108, 99, 255, 0.6);
+      animation: pulse 1.6s infinite;
+      cursor: pointer;
+    }
+
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(108, 99, 255, 0.6);
+      }
+
+      70% {
+        box-shadow: 0 0 0 10px rgba(108, 99, 255, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(108, 99, 255, 0);
+      }
+    }
+
+    #loading {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #6c63ff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="panel">
+    <h2>Τοποθεσία</h2>
+    <div id="location-name">Κάντε κλικ στον χάρτη</div>
+    <div id="coords"></div>
+  </div>
+
+  <div id="hint">Κάντε κλικ οπουδήποτε στον χάρτη για να επιλέξετε τοποθεσία</div>
+
+  <div id="map"></div>
+
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
+  <script>
+    const MAPBOX_TOKEN = 'pk.eyJ1IjoicGFwb3N0b2wiLCJhIjoiY2xsZXg0c240MHphNzNrbjE3Z2hteGNwNSJ9.K1O6D38nMeeIzDKqa4Fynw';
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: [23.7275, 37.9838], // Athens
+      zoom: 13,
+    });
+
+    map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+    map.addControl(new mapboxgl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: false,
+      showUserHeading: false,
+    }), 'bottom-right');
+
+    const locationNameEl = document.getElementById('location-name');
+    const coordsEl = document.getElementById('coords');
+    const hint = document.getElementById('hint');
+
+    let marker = null;
+    let modelAbortController = null;
+
+    async function reverseGeocode(lng, lat) {
+      if (modelAbortController) {
+        modelAbortController.abort();
+        modelAbortController = null;
+      }
+      locationNameEl.innerHTML = '<span id="loading"></span> Αναζήτηση…';
+      coordsEl.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?language=el&access_token=${MAPBOX_TOKEN}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        const feature = data.features?.[0];
+        if (!feature) {
+          locationNameEl.textContent = 'Άγνωστη τοποθεσία';
+          return;
+        }
+
+        // Same logic as app/index.tsx: pick locality / place / district from context
+        const context = feature.context || [];
+        const area = context.find(c =>
+          c.id.startsWith('locality') ||
+          c.id.startsWith('place') ||
+          c.id.startsWith('district')
+        );
+
+
+
+
+        const name = area?.text || 'Καπου στην Αθήνα';
+        locationNameEl.textContent = name;
+        coordsEl.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+        if (area?.text) {
+          modelAbortController = new AbortController();
+          try {
+            const model = `https://oasa.evox.uno/locationName/${encodeURIComponent(area.text)}`;
+            const model_res = await fetch(model, { signal: modelAbortController.signal });
+            const model_data = await model_res.json();
+            locationNameEl.textContent = `${locationNameEl.textContent} -> ${model_data.cleaned || name}`;
+          } catch (modelErr) {
+            if (modelErr.name !== 'AbortError') console.error(modelErr);
+          } finally {
+            modelAbortController = null;
+          }
+        }
+
+      } catch (err) {
+        locationNameEl.textContent = 'Σφάλμα σύνδεσης';
+        console.error(err);
+      }
+    }
+
+    map.on('click', (e) => {
+      const { lng, lat } = e.lngLat;
+
+      // Hide hint after first click
+      hint.classList.add('hidden');
+
+      // Remove old marker
+      if (marker) marker.remove();
+
+      // Add pulsing marker
+      const el = document.createElement('div');
+      el.className = 'marker-pulse';
+      marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([lng, lat])
+        .addTo(map);
+
+      reverseGeocode(lng, lat);
+    });
+
+    map.on('load', () => {
+      // Try to center on user's location on load
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            map.flyTo({
+              center: [pos.coords.longitude, pos.coords.latitude],
+              zoom: 14,
+              duration: 1200,
+            });
+          },
+          () => { } // ignore denial
+        );
+      }
+    });
+  </script>
+</body>
+
+</html>
